@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Activity, Bot } from 'lucide-react';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 
 const navItems = [
   { 
@@ -57,6 +58,13 @@ const Sidebar = () => {
           ))}
         </div>
       </nav>
+
+      {/* Theme Toggle */}
+      <div className="p-4 border-t border-sidebar-border">
+        <div className="flex items-center justify-center">
+          <ThemeToggle />
+        </div>
+      </div>
 
       {/* Status Indicator */}
       <div className="p-4 border-t border-sidebar-border">
