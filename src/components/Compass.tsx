@@ -13,7 +13,7 @@ const Compass = ({ direction }: CompassProps) => {
   ];
 
   return (
-    <div className="relative w-48 h-48 mx-auto">
+    <div className="relative w-full max-w-48 h-48 mx-auto">
       {/* Outer ring with glow */}
       <div className="absolute inset-0 rounded-full border-2 border-primary/30 glow-primary" />
       

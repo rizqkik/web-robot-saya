@@ -14,7 +14,7 @@ interface GasDataTableProps {
 
 const GasDataTable = ({ data }: GasDataTableProps) => {
   return (
-    <div className="rounded-lg border border-border overflow-hidden">
+    <div className="rounded-lg border border-border overflow-hidden overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow className="bg-card hover:bg-card border-border">
