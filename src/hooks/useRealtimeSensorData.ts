@@ -5,9 +5,9 @@ import { toast } from '@/hooks/use-toast';
 // ============================================
 // CONFIGURE YOUR WEBSOCKET URL HERE
 // ============================================
-const WEBSOCKET_URL = 'ws://localhost:8080/sensor-stream';
+const WEBSOCKET_URL = 'ws://localhost:7002';
 // Example URLs:
-// - Local: 'ws://localhost:8080/sensor-stream'
+// - Local: 'ws://localhost:7002'
 // - Production: 'wss://your-robot-server.com/sensor-stream'
 // ============================================
 

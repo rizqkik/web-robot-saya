@@ -44,10 +44,10 @@ const Compass = ({ direction }: CompassProps) => {
               isActive ? 'text-primary scale-110' : 'text-muted-foreground'
             }`}
             style={{
-              'inset-inline-start': `${x}%`,
-              'inset-block-start': `${y}%`,
+              left: `${x}%`,
+              top: `${y}%`,
               transform: 'translate(-50%, -50%)',
-            }}
+            } as React.CSSProperties}
           >
             {label}
           </div>

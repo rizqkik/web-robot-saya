@@ -103,7 +103,7 @@ const Dashboard = () => {
             <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">
               Camera POV
             </h2>
-            <VideoFeed isActive={isConnected} streamUrl={isConnected ? 'http://localhost:5000/video_feed' : undefined} />
+            <VideoFeed isActive={isConnected} streamUrl={isConnected ? 'http://localhost:5001/video_feed' : undefined} />
           </div>
 
           {/* Gas Concentration */}
