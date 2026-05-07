@@ -1,17 +1,135 @@
-import { MapPin, Gauge, Wind, AlertTriangle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Battery, Wind, AlertTriangle, X } from 'lucide-react';
 import Compass from '@/components/Compass';
 import VideoFeed from '@/components/VideoFeed';
 import AlertBanner from '@/components/AlertBanner';
-import StatCard from '@/components/StatCard';
 import ConnectionStatus from '@/components/ConnectionStatus';
 import { useSensorData } from '@/contexts/SensorDataContext';
-import { getWorstStatus, getDangerLevelColor } from '@/data/mockData';
+import { GasReading, getWorstStatus, getDangerLevelColor } from '@/data/mockData';
+
+const LEVEL_MODAL_INTERVAL_MS = 5 * 60 * 1000;
+
+type BatteryStatus = 'Full' | 'Good' | 'Low' | 'Critical';
+type AreaModalLevel = 'Safe' | 'Moderate' | 'High' | 'Dangerous' | 'Critical';
+
+const getRandomBatteryValue = () => Math.floor(Math.random() * 101);
+
+const clampBatteryValue = (value: number) => Math.min(Math.max(value, 0), 100);
+
+const getBatteryStatus = (value: number): BatteryStatus => {
+  if (value > 90) return 'Full';
+  if (value > 60) return 'Good';
+  if (value >= 30) return 'Low';
+  return 'Critical';
+};
+
+const getBatteryClasses = (value: number) => {
+  if (value > 60) {
+    return {
+      bar: 'bg-success',
+      text: 'text-success',
+      border: 'border-success/30',
+      background: 'bg-success/10',
+    };
+  }
+
+  if (value >= 30) {
+    return {
+      bar: 'bg-warning',
+      text: 'text-warning',
+      border: 'border-warning/30',
+      background: 'bg-warning/10',
+    };
+  }
+
+  return {
+    bar: 'bg-destructive',
+    text: 'text-destructive',
+    border: 'border-destructive/30',
+    background: 'bg-destructive/10',
+  };
+};
+
+const getModalDangerLevel = (currentStatus: string, latestReading?: GasReading): AreaModalLevel => {
+  if (latestReading && (latestReading.co2 > 1000 || latestReading.co > 10 || latestReading.lpg > 1000 || latestReading.h2s > 1.5)) {
+    return 'Critical';
+  }
+
+  if (currentStatus === 'Low') return 'Moderate';
+  if (currentStatus === 'Safe' || currentStatus === 'Moderate' || currentStatus === 'High' || currentStatus === 'Dangerous') {
+    return currentStatus;
+  }
+
+  return 'Safe';
+};
+
+const getModalDangerLevelColor = (level: AreaModalLevel) => {
+  if (level === 'Critical') return 'text-destructive';
+  return getDangerLevelColor(level);
+};
+
+const formatGasValue = (value?: number) => (typeof value === 'number' ? value.toFixed(2) : 'N/A');
+
+const BatteryIndicator = ({ title, value }: { title: string; value: number }) => {
+  const status = getBatteryStatus(value);
+  const classes = getBatteryClasses(value);
+
+  return (
+    <div className={`p-4 rounded-lg bg-card border ${classes.border} transition-all duration-300`}>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{title}</p>
+          <p className={`text-2xl font-bold font-mono ${classes.text}`}>{value}%</p>
+        </div>
+        <div className={`p-2 rounded-lg border ${classes.border} ${classes.background}`}>
+          <Battery className={`w-5 h-5 ${classes.text}`} />
+        </div>
+      </div>
+
+      <div className="h-3 bg-muted rounded-full overflow-hidden mb-3">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${classes.bar}`}
+          style={{ width: `${value}%` }}
+        />
+      </div>
+
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-muted-foreground">Status</span>
+        <span className={`font-bold ${classes.text}`}>{status}</span>
+      </div>
+    </div>
+  );
+};
 
 const Dashboard = () => {
   const { readings, robotStatus, isConnected } = useSensorData();
-  
+  const [robotBattery, setRobotBattery] = useState(getRandomBatteryValue);
+  const [powerbankBattery, setPowerbankBattery] = useState(getRandomBatteryValue);
+  const [isLevelModalOpen, setIsLevelModalOpen] = useState(false);
+  const [levelModalTimestamp, setLevelModalTimestamp] = useState(() => new Date().toLocaleString());
+
   const currentStatus = readings.length > 0 ? getWorstStatus(readings) : 'Safe';
   const isHighDanger = currentStatus === 'High' || currentStatus === 'Dangerous';
+  const latestReading = readings[0];
+  const modalDangerLevel = getModalDangerLevel(currentStatus, latestReading);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRobotBattery((previousValue) => clampBatteryValue(previousValue + Math.floor(Math.random() * 7) - 3));
+      setPowerbankBattery((previousValue) => clampBatteryValue(previousValue + Math.floor(Math.random() * 5) - 2));
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLevelModalTimestamp(new Date().toLocaleString());
+      setIsLevelModalOpen(true);
+    }, LEVEL_MODAL_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Use default values if no data yet
   const status = robotStatus || {
@@ -50,21 +168,10 @@ const Dashboard = () => {
             <Compass direction={status.direction} />
           </div>
 
-          {/* Stats Grid */}
+          {/* Battery Status Grid */}
           <div className="grid grid-cols-2 gap-4">
-            <StatCard
-              title="Gas Location"
-              value={status.gasLocation}
-              icon={MapPin}
-              variant="default"
-            />
-            <StatCard
-              title="Distance"
-              value={status.distance}
-              unit="m from control"
-              icon={Gauge}
-              variant="default"
-            />
+            <BatteryIndicator title="Robot Battery" value={robotBattery} />
+            <BatteryIndicator title="Powerbank" value={powerbankBattery} />
           </div>
 
           {/* Level Area Status */}
@@ -139,7 +246,7 @@ const Dashboard = () => {
                 <span>1000 ppm</span>
               </div>
               <div className="h-3 bg-muted rounded-full overflow-hidden">
-                <div 
+                <div
                   className="h-full bg-gradient-to-r from-success via-warning to-destructive transition-all duration-500"
                   style={{ width: `${Math.min((status.gasConcentration / 1000) * 100, 100)}%` }}
                 />
@@ -148,6 +255,61 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {isLevelModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
+          onClick={() => setIsLevelModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-lg bg-card border border-border shadow-2xl overflow-hidden"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-5 border-b border-border">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Level Area Status</p>
+                <h3 className={`text-2xl font-bold ${getModalDangerLevelColor(modalDangerLevel)}`}>
+                  {modalDangerLevel}
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                aria-label="Close level area status popup"
+                onClick={() => setIsLevelModalOpen(false)}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-5">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg bg-muted/40 border border-border">
+                  <p className="text-xs text-muted-foreground mb-1">CO2</p>
+                  <p className="text-xl font-bold font-mono text-foreground">{formatGasValue(latestReading?.co2)} <span className="text-sm text-muted-foreground">ppm</span></p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/40 border border-border">
+                  <p className="text-xs text-muted-foreground mb-1">CO</p>
+                  <p className="text-xl font-bold font-mono text-foreground">{formatGasValue(latestReading?.co)} <span className="text-sm text-muted-foreground">ppm</span></p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/40 border border-border">
+                  <p className="text-xs text-muted-foreground mb-1">LPG</p>
+                  <p className="text-xl font-bold font-mono text-foreground">{formatGasValue(latestReading?.lpg)} <span className="text-sm text-muted-foreground">ppm</span></p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/40 border border-border">
+                  <p className="text-xs text-muted-foreground mb-1">H2S</p>
+                  <p className="text-xl font-bold font-mono text-foreground">{formatGasValue(latestReading?.h2s)} <span className="text-sm text-muted-foreground">ppm</span></p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-4 rounded-lg bg-muted/30 border border-border px-4 py-3">
+                <span className="text-sm text-muted-foreground">Timestamp</span>
+                <span className="text-sm font-mono text-foreground text-right">{levelModalTimestamp}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Alert Banner */}
       <AlertBanner show={isHighDanger && isConnected} />
