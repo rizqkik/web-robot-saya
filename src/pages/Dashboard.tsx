@@ -123,10 +123,13 @@ const Dashboard = () => {
   }, []);
 
   useEffect(() => {
-    const interval = setInterval(() => {
+    const showLevelModal = () => {
       setLevelModalTimestamp(new Date().toLocaleString());
       setIsLevelModalOpen(true);
-    }, LEVEL_MODAL_INTERVAL_MS);
+    };
+
+    showLevelModal();
+    const interval = setInterval(showLevelModal, LEVEL_MODAL_INTERVAL_MS);
 
     return () => clearInterval(interval);
   }, []);
