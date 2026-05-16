@@ -15,10 +15,13 @@ interface IncomingSensorData {
   };
   prediction: {
     area_level: string;
+    details?: Record<string, string>;
   };
-  battery: number;
+  battery: {
+    robot: number;
+    powerbank: number;
+  } | number;
   orientation: number;
-  powerbank?: number;
 }
 
 const normalizeDangerLevel = (value?: string): DangerLevel => {
@@ -120,8 +123,15 @@ export const useRealtimeSensorData = (options: UseRealtimeSensorDataOptions = {}
       return updated;
     });
 
-    setBattery(data.battery);
-    setPowerbankBattery(data.powerbank ?? data.battery);
+    const batteryRobot = typeof data.battery === 'number'
+      ? data.battery
+      : data.battery.robot;
+    const batteryPowerbank = typeof data.battery === 'number'
+      ? data.battery
+      : data.battery.powerbank;
+
+    setBattery(batteryRobot);
+    setPowerbankBattery(batteryPowerbank ?? batteryRobot);
     setLastUpdate(new Date());
   }, [maxReadings]);
 
