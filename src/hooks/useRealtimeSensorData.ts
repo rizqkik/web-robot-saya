@@ -1,259 +1,221 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { io, Socket } from 'socket.io-client';
 import { GasReading, RobotStatus, DangerLevel, getWorstStatus } from '@/data/mockData';
 import { toast } from '@/hooks/use-toast';
 
-// ============================================
-// CONFIGURE YOUR WEBSOCKET URL HERE
-// ============================================
-const WEBSOCKET_URL = 'ws://localhost:7002';
-// Example URLs:
-// - Local: 'ws://localhost:7002'
-// - Production: 'wss://your-robot-server.com/sensor-stream'
-// ============================================
+const SOCKET_IO_URL = 'http://192.168.137.243:5000';
 
 interface IncomingSensorData {
-  id?: number;
-  timestamp?: string;
-  co2: number;
-  co: number;
-  lpg: number;
-  h2s: number;
-  status?: DangerLevel;
-  direction?: number; // From MPU6050 gyro sensor
-  distance?: number; // From AS5600 encoders
-  gasLocation?: string; // Current location/sector
+  timestamp: string;
+  sensor: {
+    CO2: number;
+    CO: number;
+    LPG: number;
+    H2S: number;
+  };
+  prediction: {
+    area_level: string;
+  };
+  battery: number;
+  orientation: number;
+  powerbank?: number;
 }
 
+const normalizeDangerLevel = (value?: string): DangerLevel => {
+  if (!value) return 'Safe';
+  const normalized = value.trim().toLowerCase();
+  switch (normalized) {
+    case 'safe':
+      return 'Safe';
+    case 'low':
+      return 'Low';
+    case 'moderate':
+      return 'Moderate';
+    case 'high':
+      return 'High';
+    case 'dangerous':
+      return 'Dangerous';
+    default:
+      return 'Safe';
+  }
+};
+
 const calculateStatus = (data: IncomingSensorData): DangerLevel => {
-  // If status is provided by the robot, use it
-  if (data.status) return data.status;
-  
-  // Otherwise calculate based on gas levels
-  if (data.lpg > 900 || data.co > 8 || data.h2s > 1) return 'Dangerous';
-  if (data.lpg > 700 || data.co > 6 || data.h2s > 0.7) return 'High';
-  if (data.lpg > 500 || data.co > 4 || data.h2s > 0.4) return 'Moderate';
-  if (data.lpg > 300 || data.co > 2 || data.h2s > 0.2) return 'Low';
+  if (data.prediction) {
+    return normalizeDangerLevel(data.prediction.area_level);
+  }
+
+  if (data.sensor.LPG > 900 || data.sensor.CO > 8 || data.sensor.H2S > 1) return 'Dangerous';
+  if (data.sensor.LPG > 700 || data.sensor.CO > 6 || data.sensor.H2S > 0.7) return 'High';
+  if (data.sensor.LPG > 500 || data.sensor.CO > 4 || data.sensor.H2S > 0.4) return 'Moderate';
+  if (data.sensor.LPG > 300 || data.sensor.CO > 2 || data.sensor.H2S > 0.2) return 'Low';
   return 'Safe';
 };
 
 const generateRobotStatus = (readings: GasReading[], latestData?: IncomingSensorData): RobotStatus => {
   const latestReading = readings[0];
   const worstStatus = getWorstStatus(readings);
-  
+  const levelArea = latestData ? normalizeDangerLevel(latestData.prediction?.area_level) : worstStatus;
+
   let mostDetectedGas = 'LPG';
-  let maxConcentration = latestReading?.lpg || 0;
-  
+  let gasConcentration = latestReading?.lpg ?? 0;
+
   if (latestReading) {
-    if (latestReading.co2 > maxConcentration) {
-      mostDetectedGas = 'CO2';
-      maxConcentration = latestReading.co2;
-    }
-    if (latestReading.co * 100 > maxConcentration) {
-      mostDetectedGas = 'CO';
-      maxConcentration = latestReading.co * 100;
-    }
-    if (latestReading.h2s * 1000 > maxConcentration) {
-      mostDetectedGas = 'H2S';
-      maxConcentration = latestReading.h2s * 1000;
-    }
+    const gasValues = [
+      { label: 'CO2', value: latestReading.co2 },
+      { label: 'CO', value: latestReading.co * 100 },
+      { label: 'LPG', value: latestReading.lpg },
+      { label: 'H2S', value: latestReading.h2s * 1000 },
+    ];
+
+    const highest = gasValues.reduce((prev, current) => (current.value > prev.value ? current : prev), gasValues[0]);
+    mostDetectedGas = highest.label;
+    gasConcentration = latestReading[highest.label.toLowerCase() as keyof GasReading] as number || latestReading.lpg;
   }
 
   return {
-    direction: latestData?.direction ?? Math.floor(Math.random() * 360), // From MPU6050
-    gasLocation: latestData?.gasLocation ?? 'Sector A-1', // Current location
-    distance: latestData?.distance ?? 10.0, // From AS5600 encoders
-    levelArea: worstStatus,
+    direction: latestData?.orientation ?? Math.floor(Math.random() * 360),
+    gasLocation: 'Sector A-1',
+    distance: 10.0,
+    levelArea,
     mostDetectedGas,
-    gasConcentration: latestReading?.lpg || 0,
-    isEvacuationNeeded: worstStatus === 'High' || worstStatus === 'Dangerous',
+    gasConcentration,
+    isEvacuationNeeded: levelArea === 'High' || levelArea === 'Dangerous',
   };
 };
 
 interface UseRealtimeSensorDataOptions {
   maxReadings?: number;
-  reconnectInterval?: number;
-  enableSimulation?: boolean; // Fallback to simulation if WebSocket fails
 }
 
 export const useRealtimeSensorData = (options: UseRealtimeSensorDataOptions = {}) => {
-  const { maxReadings = 20, reconnectInterval = 5000, enableSimulation = true } = options;
-  
+  const { maxReadings = 20 } = options;
+
   const [readings, setReadings] = useState<GasReading[]>([]);
   const [robotStatus, setRobotStatus] = useState<RobotStatus | null>(null);
+  const [battery, setBattery] = useState<number | null>(null);
+  const [powerbankBattery, setPowerbankBattery] = useState<number | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  
-  const wsRef = useRef<WebSocket | null>(null);
-  const readingIdRef = useRef(1);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const simulationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [isAutoUpdating, setIsAutoUpdating] = useState(true);
 
-  // Process incoming sensor data
+  const socketRef = useRef<Socket | null>(null);
+  const readingIdRef = useRef(1);
+
   const processData = useCallback((data: IncomingSensorData) => {
     const reading: GasReading = {
-      id: data.id || readingIdRef.current++,
+      id: readingIdRef.current++,
       timestamp: data.timestamp || new Date().toLocaleString(),
-      co2: data.co2,
-      co: data.co,
-      lpg: data.lpg,
-      h2s: data.h2s,
-      status: calculateStatus(data),
+      co2: data.sensor.CO2,
+      co: data.sensor.CO,
+      lpg: data.sensor.LPG,
+      h2s: data.sensor.H2S,
+      status: normalizeDangerLevel(data.prediction?.area_level),
     };
-    
+
     setReadings(prev => {
       const updated = [reading, ...prev].slice(0, maxReadings);
       setRobotStatus(generateRobotStatus(updated, data));
       return updated;
     });
-    
+
+    setBattery(data.battery);
+    setPowerbankBattery(data.powerbank ?? data.battery);
     setLastUpdate(new Date());
-    console.log('[WebSocket] Sensor data received:', reading);
   }, [maxReadings]);
 
-  // Simulation fallback
-  const startSimulation = useCallback(() => {
-    if (!enableSimulation) return;
-    
-    console.log('[Simulation] Starting fallback simulation...');
-    toast({
-      title: "Simulation Mode",
-      description: "Using simulated data. Real WebSocket connection failed.",
-      variant: "destructive",
-    });
-    
-    simulationIntervalRef.current = setInterval(() => {
-      const simulatedData: IncomingSensorData = {
-        co2: Math.floor(250 + Math.random() * 350),
-        co: parseFloat((0.5 + Math.random() * 9).toFixed(1)),
-        lpg: Math.floor(100 + Math.random() * 900),
-        h2s: parseFloat((0.01 + Math.random() * 1.5).toFixed(2)),
-      };
-      processData(simulatedData);
-    }, 3000);
-  }, [enableSimulation, processData]);
-
-  const stopSimulation = useCallback(() => {
-    if (simulationIntervalRef.current) {
-      clearInterval(simulationIntervalRef.current);
-      simulationIntervalRef.current = null;
-    }
-  }, []);
-
-  // WebSocket connection
   const connect = useCallback(() => {
-    // Clear any existing connections
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
     }
-    stopSimulation();
+
     setConnectionError(null);
-    
-    console.log('[WebSocket] Connecting to:', WEBSOCKET_URL);
-    
-    try {
-      const ws = new WebSocket(WEBSOCKET_URL);
-      wsRef.current = ws;
-      
-      ws.onopen = () => {
-        console.log('[WebSocket] Connected successfully');
-        setIsConnected(true);
-        setConnectionError(null);
-        
-        toast({
-          title: "Connected",
-          description: "Real-time sensor stream active",
-        });
-        
-        // Clear reconnect timeout
-        if (reconnectTimeoutRef.current) {
-          clearTimeout(reconnectTimeoutRef.current);
-          reconnectTimeoutRef.current = null;
-        }
-      };
-      
-      ws.onmessage = (event) => {
-        try {
-          const data: IncomingSensorData = JSON.parse(event.data);
-          processData(data);
-        } catch (error) {
-          console.error('[WebSocket] Failed to parse message:', error);
-        }
-      };
-      
-      ws.onerror = (error) => {
-        console.error('[WebSocket] Error:', error);
-        setConnectionError('Connection error');
-      };
-      
-      ws.onclose = (event) => {
-        console.log('[WebSocket] Disconnected:', event.code, event.reason);
-        setIsConnected(false);
-        wsRef.current = null;
-        
-        // Attempt reconnection
-        if (!reconnectTimeoutRef.current) {
-          console.log(`[WebSocket] Reconnecting in ${reconnectInterval}ms...`);
-          reconnectTimeoutRef.current = setTimeout(() => {
-            reconnectTimeoutRef.current = null;
-            connect();
-          }, reconnectInterval);
-        }
-        
-        // Start simulation as fallback after first failed attempt
-        if (enableSimulation && readings.length === 0) {
-          startSimulation();
-        }
-      };
-    } catch (error) {
-      console.error('[WebSocket] Failed to create connection:', error);
-      setConnectionError('Failed to connect');
-      setIsConnected(false);
-      
-      // Fallback to simulation
-      if (enableSimulation) {
-        startSimulation();
+
+    const socket = io(SOCKET_IO_URL, {
+      transports: ['websocket'],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 2000,
+      autoConnect: true,
+    });
+
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      setIsConnected(true);
+      setConnectionError(null);
+
+      toast({
+        title: 'Connected',
+        description: 'Real-time sensor stream active',
+      });
+    });
+
+    socket.on('sensor_data', (data: IncomingSensorData) => {
+      if (isAutoUpdating) {
+        processData(data);
       }
-    }
-  }, [processData, reconnectInterval, enableSimulation, startSimulation, stopSimulation, readings.length]);
+    });
+
+    socket.on('disconnect', (reason) => {
+      setIsConnected(false);
+      if (reason !== 'io client disconnect') {
+        setConnectionError('Disconnected from server');
+      }
+    });
+
+    socket.on('connect_error', (error) => {
+      setConnectionError('Connection error');
+      console.error('[Socket.IO] connect_error', error);
+    });
+
+    socket.on('error', (error) => {
+      console.error('[Socket.IO] error', error);
+    });
+  }, [isAutoUpdating, processData]);
 
   const disconnect = useCallback(() => {
-    // Clear reconnect timeout
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
     }
-    
-    // Close WebSocket
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-    
-    // Stop simulation
-    stopSimulation();
-    
-    setIsConnected(false);
-    console.log('[WebSocket] Disconnected manually');
-  }, [stopSimulation]);
 
-  // Auto-connect on mount
+    setIsConnected(false);
+    setConnectionError('Disconnected');
+  }, []);
+
+  const toggleRefresh = useCallback(() => {
+    setIsAutoUpdating(prev => {
+      const next = !prev;
+      if (next) {
+        connect();
+      } else {
+        disconnect();
+      }
+      return next;
+    });
+  }, [connect, disconnect]);
+
   useEffect(() => {
     connect();
-    
     return () => {
       disconnect();
     };
-  }, []);
+  }, [connect, disconnect]);
 
   return {
     readings,
     robotStatus,
+    battery,
+    powerbankBattery,
     isConnected,
     lastUpdate,
     connectionError,
+    isAutoUpdating,
     connect,
     disconnect,
+    toggleRefresh,
   };
 };

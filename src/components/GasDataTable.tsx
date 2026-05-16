@@ -13,6 +13,8 @@ interface GasDataTableProps {
 }
 
 const GasDataTable = ({ data }: GasDataTableProps) => {
+  // Only show the latest 10 readings
+  const displayData = data.slice(0, 10);
   return (
     <div className="rounded-lg border border-border overflow-hidden overflow-x-auto">
       <Table>
@@ -28,7 +30,7 @@ const GasDataTable = ({ data }: GasDataTableProps) => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.map((reading) => (
+          {displayData.map((reading) => (
             <TableRow 
               key={reading.id} 
               className="border-border hover:bg-muted/50 transition-colors"

@@ -5,11 +5,15 @@ import { GasReading, RobotStatus } from '@/data/mockData';
 interface SensorDataContextType {
   readings: GasReading[];
   robotStatus: RobotStatus | null;
+  battery: number | null;
+  powerbankBattery: number | null;
   isConnected: boolean;
   lastUpdate: Date | null;
   connectionError: string | null;
+  isAutoUpdating: boolean;
   connect: () => void;
   disconnect: () => void;
+  toggleRefresh: () => void;
 }
 
 const SensorDataContext = createContext<SensorDataContextType | null>(null);

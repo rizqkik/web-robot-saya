@@ -6,7 +6,7 @@ import { getWorstStatus } from '@/data/mockData';
 import { Button } from '@/components/ui/button';
 
 const DataLogs = () => {
-  const { readings, isConnected, lastUpdate, connect, disconnect } = useSensorData();
+  const { readings, isConnected, lastUpdate, connect, disconnect, isAutoUpdating, toggleRefresh } = useSensorData();
   const worstStatus = readings.length > 0 ? getWorstStatus(readings) : 'Safe';
 
   const dangerousCount = readings.filter(r => r.status === 'Dangerous' || r.status === 'High').length;
@@ -32,10 +32,10 @@ const DataLogs = () => {
             variant="outline" 
             size="sm" 
             className="gap-2"
-            onClick={isConnected ? disconnect : connect}
+            onClick={toggleRefresh}
           >
-            {isConnected ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-            {isConnected ? 'Pause' : 'Resume'}
+            <RefreshCw className="w-4 h-4" />
+            {isAutoUpdating ? 'Stop Refresh' : 'Refresh'}
           </Button>
           <Button variant="outline" size="sm" className="gap-2">
             <Download className="w-4 h-4" />
@@ -87,7 +87,7 @@ const DataLogs = () => {
               isConnected ? 'bg-success animate-pulse' : 'bg-muted-foreground'
             }`} />
             <span className="text-sm font-medium text-muted-foreground">
-              {isConnected ? 'Live Data Feed - Updating every 3 seconds' : 'Data Feed Paused'}
+              {isAutoUpdating ? 'Refreshing every 3 seconds' : 'Data Feed Paused - Click Refresh to start'}
             </span>
           </div>
           <span className="text-xs font-mono text-muted-foreground">

@@ -42,6 +42,7 @@ def get_latest_sensor_data():
         data = dict(zip(columns, result))
         # Convert timestamp to ISO format string
         data['timestamp'] = data['timestamp'].isoformat()
+        print(f"Backend sending data: {data}")  # Debug log
         return data
     return None
 
@@ -72,6 +73,12 @@ def get_sensor_data():
     if data:
         return jsonify(data)
     return jsonify({'error': 'No data available'}), 404
+
+@app.route('/api/test')
+def test_endpoint():
+    data = get_latest_sensor_data()
+    print(f"Test endpoint called. Data: {data}")
+    return jsonify({'message': 'Test endpoint', 'data': data})
 
 @app.route('/api/history')
 def get_history():

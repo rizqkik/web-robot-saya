@@ -102,21 +102,21 @@ const BatteryIndicator = ({ title, value }: { title: string; value: number }) =>
 };
 
 const Dashboard = () => {
-  const { readings, robotStatus, isConnected } = useSensorData();
-  const [robotBattery, setRobotBattery] = useState(getRandomBatteryValue);
-  const [powerbankBattery, setPowerbankBattery] = useState(getRandomBatteryValue);
+  const { readings, robotStatus, isConnected, battery, powerbankBattery } = useSensorData();
+  const [simRobotBattery, setSimRobotBattery] = useState(getRandomBatteryValue);
+  const [simPowerbankBattery, setSimPowerbankBattery] = useState(getRandomBatteryValue);
   const [isLevelModalOpen, setIsLevelModalOpen] = useState(false);
   const [levelModalTimestamp, setLevelModalTimestamp] = useState(() => new Date().toLocaleString());
 
-  const currentStatus = readings.length > 0 ? getWorstStatus(readings) : 'Safe';
+  const currentStatus = robotStatus?.levelArea ?? 'Safe';
   const isHighDanger = currentStatus === 'High' || currentStatus === 'Dangerous';
   const latestReading = readings[0];
   const modalDangerLevel = getModalDangerLevel(currentStatus, latestReading);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setRobotBattery((previousValue) => clampBatteryValue(previousValue + Math.floor(Math.random() * 7) - 3));
-      setPowerbankBattery((previousValue) => clampBatteryValue(previousValue + Math.floor(Math.random() * 5) - 2));
+      setSimRobotBattery((previousValue) => clampBatteryValue(previousValue + Math.floor(Math.random() * 7) - 3));
+      setSimPowerbankBattery((previousValue) => clampBatteryValue(previousValue + Math.floor(Math.random() * 5) - 2));
     }, 30000);
 
     return () => clearInterval(interval);
@@ -134,7 +134,9 @@ const Dashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Use default values if no data yet
+  const robotBatteryValue = battery ?? simRobotBattery;
+  const powerbankBatteryValue = powerbankBattery ?? battery ?? simPowerbankBattery;
+
   const status = robotStatus || {
     direction: 0,
     gasLocation: 'Awaiting data...',
@@ -173,8 +175,8 @@ const Dashboard = () => {
 
           {/* Battery Status Grid */}
           <div className="grid grid-cols-2 gap-4">
-            <BatteryIndicator title="Robot Battery" value={robotBattery} />
-            <BatteryIndicator title="Powerbank" value={powerbankBattery} />
+            <BatteryIndicator title="Robot Battery" value={robotBatteryValue} />
+            <BatteryIndicator title="Powerbank" value={powerbankBatteryValue} />
           </div>
 
           {/* Level Area Status */}
@@ -213,7 +215,7 @@ const Dashboard = () => {
             <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">
               Camera POV
             </h2>
-            <VideoFeed isActive={isConnected} streamUrl={isConnected ? 'http://localhost:5001/video_feed' : undefined} />
+            <VideoFeed isActive={isConnected} streamUrl={isConnected ? 'http://192.168.137.243:5000/video_feed' : undefined} />
           </div>
 
           {/* Gas Concentration */}
