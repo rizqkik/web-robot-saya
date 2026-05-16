@@ -10,10 +10,9 @@ const VideoFeed = ({ isActive = false, streamUrl }: VideoFeedProps) => {
     <div className="relative aspect-video bg-card rounded-lg border border-border overflow-hidden">
       {/* Video element if active and stream available */}
       {isActive && streamUrl ? (
-        <video
+        <img
           src={streamUrl}
-          autoPlay
-          muted
+          alt="Camera feed"
           className="w-full h-full object-cover"
           onError={() => console.error('Video stream failed to load')}
         />
