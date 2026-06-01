@@ -5,6 +5,7 @@ interface CompassProps {
 }
 
 const Compass = ({ direction }: CompassProps) => {
+  const heading = Number.isFinite(direction) ? Math.round(((direction % 360) + 360) % 360) : 0;
   const directions = [
     { label: 'N', angle: 0 },
     { label: 'E', angle: 90 },
@@ -32,7 +33,8 @@ const Compass = ({ direction }: CompassProps) => {
 
       {/* Direction markers */}
       {directions.map(({ label, angle }) => {
-        const isActive = Math.abs(direction - angle) < 45 || Math.abs(direction - angle) > 315;
+        const delta = Math.abs(heading - angle);
+        const isActive = delta < 45 || delta > 315;
         const radians = (angle - 90) * (Math.PI / 180);
         const x = 50 + 40 * Math.cos(radians);
         const y = 50 + 40 * Math.sin(radians);
@@ -58,7 +60,7 @@ const Compass = ({ direction }: CompassProps) => {
       <div className="absolute inset-0 flex items-center justify-center">
         <div 
           className="relative transition-transform duration-500"
-          style={{ transform: `rotate(${direction}deg)` }}
+          style={{ transform: `rotate(${heading}deg)` }}
         >
           {/* Direction arrow */}
           <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-b-8 border-l-transparent border-r-transparent border-b-primary" />
@@ -72,7 +74,7 @@ const Compass = ({ direction }: CompassProps) => {
 
       {/* Degree indicator */}
       <div className="absolute -bottom-6 left-1/2 -translate-x-1/2">
-        <span className="font-mono text-sm text-primary">{direction}°</span>
+        <span className="font-mono text-sm text-primary">{heading}&deg;</span>
       </div>
     </div>
   );

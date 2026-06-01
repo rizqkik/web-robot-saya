@@ -20,13 +20,19 @@ interface IncomingSensorData {
   battery: {
     robot: number;
   } | number;
-  orientation: number;
+  orientation?: number | string;
   co2_valid?: boolean;
   control_connected?: boolean;
   control_age_ms?: number;
   motor_left?: number;
   motor_right?: number;
 }
+
+const normalizeHeading = (value?: number | string): number => {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return 0;
+  return Math.round(((numericValue % 360) + 360) % 360);
+};
 
 const normalizeDangerLevel = (value?: string): DangerLevel => {
   if (!value) return 'Unknown';
@@ -85,7 +91,7 @@ const generateRobotStatus = (readings: GasReading[], latestData?: IncomingSensor
   }
 
   return {
-    direction: latestData?.orientation ?? Math.floor(Math.random() * 360),
+    direction: normalizeHeading(latestData?.orientation),
     gasLocation: 'Sector A-1',
     distance: 10.0,
     levelArea,
