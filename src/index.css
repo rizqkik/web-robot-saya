@@ -122,6 +122,10 @@
 }
 
 @layer components {
+  .status-unknown {
+    @apply bg-muted text-muted-foreground border border-border;
+  }
+
   .status-safe {
     @apply bg-success/20 text-success border border-success/30;
   }

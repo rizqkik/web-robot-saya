@@ -3,7 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import { GasReading, RobotStatus, DangerLevel, getWorstStatus } from '@/data/mockData';
 import { toast } from '@/hooks/use-toast';
 
-const SOCKET_IO_URL = 'http://192.168.137.243:5000';
+const SOCKET_IO_URL = import.meta.env.VITE_SOCKET_IO_URL || 'http://192.168.137.243:5000';
 
 interface IncomingSensorData {
   timestamp: string;
@@ -19,15 +19,23 @@ interface IncomingSensorData {
   };
   battery: {
     robot: number;
-    powerbank: number;
   } | number;
   orientation: number;
+  co2_valid?: boolean;
+  control_connected?: boolean;
+  control_age_ms?: number;
+  motor_left?: number;
+  motor_right?: number;
 }
 
 const normalizeDangerLevel = (value?: string): DangerLevel => {
-  if (!value) return 'Safe';
+  if (!value) return 'Unknown';
   const normalized = value.trim().toLowerCase();
   switch (normalized) {
+    case 'unknown':
+    case 'invalid':
+    case 'error':
+      return 'Unknown';
     case 'safe':
       return 'Safe';
     case 'low':
@@ -39,7 +47,7 @@ const normalizeDangerLevel = (value?: string): DangerLevel => {
     case 'dangerous':
       return 'Dangerous';
     default:
-      return 'Safe';
+      return 'Unknown';
   }
 };
 
@@ -84,20 +92,25 @@ const generateRobotStatus = (readings: GasReading[], latestData?: IncomingSensor
     mostDetectedGas,
     gasConcentration,
     isEvacuationNeeded: levelArea === 'High' || levelArea === 'Dangerous',
+    controlConnected: latestData?.control_connected,
+    motorLeft: latestData?.motor_left,
+    motorRight: latestData?.motor_right,
+    controlAgeMs: latestData?.control_age_ms ?? null,
   };
 };
 
 interface UseRealtimeSensorDataOptions {
   maxReadings?: number;
+  reconnectInterval?: number;
+  enableSimulation?: boolean;
 }
 
 export const useRealtimeSensorData = (options: UseRealtimeSensorDataOptions = {}) => {
-  const { maxReadings = 20 } = options;
+  const { maxReadings = 20, reconnectInterval = 2000 } = options;
 
   const [readings, setReadings] = useState<GasReading[]>([]);
   const [robotStatus, setRobotStatus] = useState<RobotStatus | null>(null);
   const [battery, setBattery] = useState<number | null>(null);
-  const [powerbankBattery, setPowerbankBattery] = useState<number | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -115,6 +128,8 @@ export const useRealtimeSensorData = (options: UseRealtimeSensorDataOptions = {}
       lpg: data.sensor.LPG,
       h2s: data.sensor.H2S,
       status: normalizeDangerLevel(data.prediction?.area_level),
+      co2Valid: data.co2_valid,
+      predictionDetails: data.prediction?.details,
     };
 
     setReadings(prev => {
@@ -125,13 +140,9 @@ export const useRealtimeSensorData = (options: UseRealtimeSensorDataOptions = {}
 
     const batteryRobot = typeof data.battery === 'number'
       ? data.battery
-      : data.battery.robot;
-    const batteryPowerbank = typeof data.battery === 'number'
-      ? data.battery
-      : data.battery.powerbank;
+      : data.battery?.robot;
 
-    setBattery(batteryRobot);
-    setPowerbankBattery(batteryPowerbank ?? batteryRobot);
+    setBattery(typeof batteryRobot === 'number' ? batteryRobot : null);
     setLastUpdate(new Date());
   }, [maxReadings]);
 
@@ -147,7 +158,7 @@ export const useRealtimeSensorData = (options: UseRealtimeSensorDataOptions = {}
       transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: Infinity,
-      reconnectionDelay: 2000,
+      reconnectionDelay: reconnectInterval,
       autoConnect: true,
     });
 
@@ -184,7 +195,7 @@ export const useRealtimeSensorData = (options: UseRealtimeSensorDataOptions = {}
     socket.on('error', (error) => {
       console.error('[Socket.IO] error', error);
     });
-  }, [isAutoUpdating, processData]);
+  }, [isAutoUpdating, processData, reconnectInterval]);
 
   const disconnect = useCallback(() => {
     if (socketRef.current) {
@@ -219,7 +230,6 @@ export const useRealtimeSensorData = (options: UseRealtimeSensorDataOptions = {}
     readings,
     robotStatus,
     battery,
-    powerbankBattery,
     isConnected,
     lastUpdate,
     connectionError,

@@ -1,4 +1,4 @@
-export type DangerLevel = 'Safe' | 'Low' | 'Moderate' | 'High' | 'Dangerous';
+export type DangerLevel = 'Unknown' | 'Safe' | 'Low' | 'Moderate' | 'High' | 'Dangerous';
 
 export interface GasReading {
   id: number;
@@ -8,6 +8,8 @@ export interface GasReading {
   lpg: number;
   h2s: number;
   status: DangerLevel;
+  co2Valid?: boolean;
+  predictionDetails?: Record<string, string>;
 }
 
 export interface RobotStatus {
@@ -18,6 +20,10 @@ export interface RobotStatus {
   mostDetectedGas: string;
   gasConcentration: number;
   isEvacuationNeeded: boolean;
+  controlConnected?: boolean;
+  motorLeft?: number;
+  motorRight?: number;
+  controlAgeMs?: number | null;
 }
 
 export const mockGasReadings: GasReading[] = [
@@ -44,7 +50,7 @@ export const mockRobotStatus: RobotStatus = {
 };
 
 export const getWorstStatus = (readings: GasReading[]): DangerLevel => {
-  const priority: DangerLevel[] = ['Dangerous', 'High', 'Moderate', 'Low', 'Safe'];
+  const priority: DangerLevel[] = ['Dangerous', 'High', 'Moderate', 'Low', 'Unknown', 'Safe'];
   for (const level of priority) {
     if (readings.some(r => r.status === level)) {
       return level;
@@ -55,6 +61,7 @@ export const getWorstStatus = (readings: GasReading[]): DangerLevel => {
 
 export const getDangerLevelColor = (level: DangerLevel): string => {
   switch (level) {
+    case 'Unknown': return 'text-muted-foreground';
     case 'Safe': return 'text-success';
     case 'Low': return 'text-success/80';
     case 'Moderate': return 'text-warning';
@@ -66,6 +73,7 @@ export const getDangerLevelColor = (level: DangerLevel): string => {
 
 export const getStatusBgClass = (level: DangerLevel): string => {
   switch (level) {
+    case 'Unknown': return 'status-unknown';
     case 'Safe': return 'status-safe';
     case 'Low': return 'status-low';
     case 'Moderate': return 'status-moderate';

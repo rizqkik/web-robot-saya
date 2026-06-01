@@ -6,7 +6,6 @@ interface SensorDataContextType {
   readings: GasReading[];
   robotStatus: RobotStatus | null;
   battery: number | null;
-  powerbankBattery: number | null;
   isConnected: boolean;
   lastUpdate: Date | null;
   connectionError: string | null;

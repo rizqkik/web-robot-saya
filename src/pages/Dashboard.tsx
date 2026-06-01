@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Battery, Wind, AlertTriangle, X } from 'lucide-react';
+import { Battery, Wind, AlertTriangle, X, Gamepad2 } from 'lucide-react';
 import Compass from '@/components/Compass';
 import VideoFeed from '@/components/VideoFeed';
 import AlertBanner from '@/components/AlertBanner';
 import ConnectionStatus from '@/components/ConnectionStatus';
 import { useSensorData } from '@/contexts/SensorDataContext';
-import { GasReading, getWorstStatus, getDangerLevelColor } from '@/data/mockData';
+import { GasReading, getDangerLevelColor } from '@/data/mockData';
 
 const LEVEL_MODAL_INTERVAL_MS = 5 * 60 * 1000;
+const VIDEO_FEED_URL = import.meta.env.VITE_VIDEO_FEED_URL || 'http://192.168.137.243:5000/video_feed';
 
 type BatteryStatus = 'Full' | 'Good' | 'Low' | 'Critical';
-type AreaModalLevel = 'Safe' | 'Moderate' | 'High' | 'Dangerous' | 'Critical';
+type AreaModalLevel = 'Unknown' | 'Safe' | 'Moderate' | 'High' | 'Dangerous' | 'Critical';
 
 const getRandomBatteryValue = () => Math.floor(Math.random() * 101);
 
@@ -55,6 +56,7 @@ const getModalDangerLevel = (currentStatus: string, latestReading?: GasReading):
     return 'Critical';
   }
 
+  if (currentStatus === 'Unknown') return 'Unknown';
   if (currentStatus === 'Low') return 'Moderate';
   if (currentStatus === 'Safe' || currentStatus === 'Moderate' || currentStatus === 'High' || currentStatus === 'Dangerous') {
     return currentStatus;
@@ -69,6 +71,7 @@ const getModalDangerLevelColor = (level: AreaModalLevel) => {
 };
 
 const formatGasValue = (value?: number) => (typeof value === 'number' ? value.toFixed(2) : 'N/A');
+const formatMotorValue = (value?: number) => (typeof value === 'number' ? value : 0);
 
 const BatteryIndicator = ({ title, value }: { title: string; value: number }) => {
   const status = getBatteryStatus(value);
@@ -102,21 +105,20 @@ const BatteryIndicator = ({ title, value }: { title: string; value: number }) =>
 };
 
 const Dashboard = () => {
-  const { readings, robotStatus, isConnected, battery, powerbankBattery } = useSensorData();
+  const { readings, robotStatus, isConnected, battery } = useSensorData();
   const [simRobotBattery, setSimRobotBattery] = useState(getRandomBatteryValue);
-  const [simPowerbankBattery, setSimPowerbankBattery] = useState(getRandomBatteryValue);
   const [isLevelModalOpen, setIsLevelModalOpen] = useState(false);
   const [levelModalTimestamp, setLevelModalTimestamp] = useState(() => new Date().toLocaleString());
 
   const currentStatus = robotStatus?.levelArea ?? 'Safe';
   const isHighDanger = currentStatus === 'High' || currentStatus === 'Dangerous';
+  const isUnknownStatus = currentStatus === 'Unknown';
   const latestReading = readings[0];
   const modalDangerLevel = getModalDangerLevel(currentStatus, latestReading);
 
   useEffect(() => {
     const interval = setInterval(() => {
       setSimRobotBattery((previousValue) => clampBatteryValue(previousValue + Math.floor(Math.random() * 7) - 3));
-      setSimPowerbankBattery((previousValue) => clampBatteryValue(previousValue + Math.floor(Math.random() * 5) - 2));
     }, 30000);
 
     return () => clearInterval(interval);
@@ -135,7 +137,6 @@ const Dashboard = () => {
   }, []);
 
   const robotBatteryValue = battery ?? simRobotBattery;
-  const powerbankBatteryValue = powerbankBattery ?? battery ?? simPowerbankBattery;
 
   const status = robotStatus || {
     direction: 0,
@@ -145,6 +146,10 @@ const Dashboard = () => {
     mostDetectedGas: 'N/A',
     gasConcentration: 0,
     isEvacuationNeeded: false,
+    controlConnected: false,
+    motorLeft: 0,
+    motorRight: 0,
+    controlAgeMs: null,
   };
 
   return (
@@ -173,15 +178,50 @@ const Dashboard = () => {
             <Compass direction={status.direction} />
           </div>
 
-          {/* Battery Status Grid */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Battery Status */}
+          <div className="grid grid-cols-1 gap-4">
             <BatteryIndicator title="Robot Battery" value={robotBatteryValue} />
-            <BatteryIndicator title="Powerbank" value={powerbankBatteryValue} />
+          </div>
+
+          {/* Robot Control Status */}
+          <div className={`p-5 rounded-lg bg-card border transition-all duration-300 ${
+            status.controlConnected ? 'border-success/30' : 'border-warning/40'
+          }`}>
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                  Robot Control
+                </h2>
+                <div className="flex items-center gap-2">
+                  <Gamepad2 className={`w-5 h-5 ${status.controlConnected ? 'text-success' : 'text-warning'}`} />
+                  <span className={`text-lg font-bold ${status.controlConnected ? 'text-success' : 'text-warning'}`}>
+                    {status.controlConnected ? 'Linked' : 'Standby'}
+                  </span>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Command age</p>
+                <p className="text-sm font-mono text-foreground">
+                  {typeof status.controlAgeMs === 'number' && status.controlAgeMs >= 0 ? `${status.controlAgeMs} ms` : 'N/A'}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg bg-muted/40 border border-border p-3">
+                <p className="text-xs text-muted-foreground mb-1">Left Motor</p>
+                <p className="text-xl font-bold font-mono text-foreground">{formatMotorValue(status.motorLeft)}</p>
+              </div>
+              <div className="rounded-lg bg-muted/40 border border-border p-3">
+                <p className="text-xs text-muted-foreground mb-1">Right Motor</p>
+                <p className="text-xl font-bold font-mono text-foreground">{formatMotorValue(status.motorRight)}</p>
+              </div>
+            </div>
           </div>
 
           {/* Level Area Status */}
           <div className={`p-6 rounded-lg bg-card border transition-all duration-300 ${
-            isHighDanger ? 'border-destructive/50 animate-pulse-glow' : 'border-border'
+            isHighDanger ? 'border-destructive/50 animate-pulse-glow' : isUnknownStatus ? 'border-warning/40' : 'border-border'
           }`}>
             <div className="flex items-center justify-between">
               <div>
@@ -190,7 +230,7 @@ const Dashboard = () => {
                 </h2>
                 <div className="flex items-center gap-3">
                   <AlertTriangle className={`w-8 h-8 ${getDangerLevelColor(currentStatus)} ${
-                    isHighDanger ? 'animate-pulse' : ''
+                    isHighDanger || isUnknownStatus ? 'animate-pulse' : ''
                   }`} />
                   <span className={`text-3xl font-bold transition-all duration-300 ${getDangerLevelColor(currentStatus)}`}>
                     {currentStatus}
@@ -198,10 +238,16 @@ const Dashboard = () => {
                 </div>
               </div>
               <div className={`px-4 py-2 rounded-lg transition-all duration-300 ${
-                isHighDanger ? 'bg-destructive/20 border border-destructive/30' : 'bg-success/20 border border-success/30'
+                isHighDanger
+                  ? 'bg-destructive/20 border border-destructive/30'
+                  : isUnknownStatus
+                    ? 'bg-warning/20 border border-warning/30'
+                    : 'bg-success/20 border border-success/30'
               }`}>
-                <span className={`text-sm font-bold ${isHighDanger ? 'text-destructive' : 'text-success'}`}>
-                  {isHighDanger ? 'CRITICAL' : 'NORMAL'}
+                <span className={`text-sm font-bold ${
+                  isHighDanger ? 'text-destructive' : isUnknownStatus ? 'text-warning' : 'text-success'
+                }`}>
+                  {isHighDanger ? 'CRITICAL' : isUnknownStatus ? 'CHECK SYSTEM' : 'NORMAL'}
                 </span>
               </div>
             </div>
@@ -215,7 +261,7 @@ const Dashboard = () => {
             <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">
               Camera POV
             </h2>
-            <VideoFeed isActive={isConnected} streamUrl={isConnected ? 'http://192.168.137.243:5000/video_feed' : undefined} />
+            <VideoFeed isActive={isConnected} streamUrl={isConnected ? VIDEO_FEED_URL : undefined} />
           </div>
 
           {/* Gas Concentration */}
@@ -291,7 +337,10 @@ const Dashboard = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 rounded-lg bg-muted/40 border border-border">
                   <p className="text-xs text-muted-foreground mb-1">CO2</p>
-                  <p className="text-xl font-bold font-mono text-foreground">{formatGasValue(latestReading?.co2)} <span className="text-sm text-muted-foreground">ppm</span></p>
+                  <p className="text-xl font-bold font-mono text-foreground">
+                    {latestReading?.co2Valid === false ? 'Invalid' : formatGasValue(latestReading?.co2)}
+                    {latestReading?.co2Valid !== false && <span className="text-sm text-muted-foreground"> ppm</span>}
+                  </p>
                 </div>
                 <div className="p-3 rounded-lg bg-muted/40 border border-border">
                   <p className="text-xs text-muted-foreground mb-1">CO</p>

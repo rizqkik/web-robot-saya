@@ -15,6 +15,9 @@ interface GasDataTableProps {
 const GasDataTable = ({ data }: GasDataTableProps) => {
   // Only show the latest 10 readings
   const displayData = data.slice(0, 10);
+
+  const formatGasValue = (value: number, digits: number) => value.toFixed(digits);
+
   return (
     <div className="rounded-lg border border-border overflow-hidden overflow-x-auto">
       <Table>
@@ -39,10 +42,16 @@ const GasDataTable = ({ data }: GasDataTableProps) => {
               <TableCell className="font-mono text-muted-foreground text-sm">
                 {reading.timestamp}
               </TableCell>
-              <TableCell className="data-cell text-right">{reading.co2.toFixed(1)}</TableCell>
-              <TableCell className="data-cell text-right">{reading.co.toFixed(1)}</TableCell>
-              <TableCell className="data-cell text-right">{reading.lpg.toFixed(1)}</TableCell>
-              <TableCell className="data-cell text-right">{reading.h2s.toFixed(2)}</TableCell>
+              <TableCell className="data-cell text-right">
+                {reading.co2Valid === false ? (
+                  <span className="text-muted-foreground">Invalid</span>
+                ) : (
+                  formatGasValue(reading.co2, 1)
+                )}
+              </TableCell>
+              <TableCell className="data-cell text-right">{formatGasValue(reading.co, 3)}</TableCell>
+              <TableCell className="data-cell text-right">{formatGasValue(reading.lpg, 3)}</TableCell>
+              <TableCell className="data-cell text-right">{formatGasValue(reading.h2s, 6)}</TableCell>
               <TableCell className="text-center">
                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusBgClass(reading.status)}`}>
                   {reading.status.toUpperCase()}
