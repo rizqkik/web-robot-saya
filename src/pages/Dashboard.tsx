@@ -6,9 +6,9 @@ import AlertBanner from '@/components/AlertBanner';
 import ConnectionStatus from '@/components/ConnectionStatus';
 import { useSensorData } from '@/contexts/SensorDataContext';
 import { GasReading, getDangerLevelColor } from '@/data/mockData';
+import { getBackendConfig } from '@/lib/backendConfig';
 
 const LEVEL_MODAL_INTERVAL_MS = 5 * 60 * 1000;
-const VIDEO_FEED_URL = import.meta.env.VITE_VIDEO_FEED_URL || 'http://192.168.137.243:5000/video_feed';
 
 type BatteryStatus = 'Full' | 'Good' | 'Low' | 'Critical';
 type AreaModalLevel = 'Unknown' | 'Safe' | 'Moderate' | 'High' | 'Dangerous' | 'Critical';
@@ -106,6 +106,7 @@ const BatteryIndicator = ({ title, value }: { title: string; value: number }) =>
 
 const Dashboard = () => {
   const { readings, robotStatus, isConnected, battery } = useSensorData();
+  const { videoFeedUrl } = getBackendConfig();
   const [simRobotBattery, setSimRobotBattery] = useState(getRandomBatteryValue);
   const [isLevelModalOpen, setIsLevelModalOpen] = useState(false);
   const [levelModalTimestamp, setLevelModalTimestamp] = useState(() => new Date().toLocaleString());
@@ -261,7 +262,7 @@ const Dashboard = () => {
             <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">
               Camera POV
             </h2>
-            <VideoFeed isActive={isConnected} streamUrl={isConnected ? VIDEO_FEED_URL : undefined} />
+            <VideoFeed isActive={isConnected} streamUrl={isConnected ? videoFeedUrl : undefined} />
           </div>
 
           {/* Gas Concentration */}

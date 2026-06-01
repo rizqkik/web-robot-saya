@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { GasReading, RobotStatus, DangerLevel, getWorstStatus } from '@/data/mockData';
 import { toast } from '@/hooks/use-toast';
-
-const SOCKET_IO_URL = import.meta.env.VITE_SOCKET_IO_URL || 'http://192.168.137.243:5000';
+import { getBackendConfig } from '@/lib/backendConfig';
 
 interface IncomingSensorData {
   timestamp: string;
@@ -159,8 +158,9 @@ export const useRealtimeSensorData = (options: UseRealtimeSensorDataOptions = {}
     }
 
     setConnectionError(null);
+    const { socketUrl } = getBackendConfig();
 
-    const socket = io(SOCKET_IO_URL, {
+    const socket = io(socketUrl, {
       transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: Infinity,
