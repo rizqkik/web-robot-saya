@@ -7,6 +7,7 @@ import ConnectionStatus from '@/components/ConnectionStatus';
 import { useSensorData } from '@/contexts/SensorDataContext';
 import { GasReading, getDangerLevelColor } from '@/data/mockData';
 import { getBackendConfig } from '@/lib/backendConfig';
+import { formatGasPpm } from '@/lib/utils';
 
 const LEVEL_MODAL_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -70,9 +71,6 @@ const getModalDangerLevelColor = (level: AreaModalLevel) => {
   return getDangerLevelColor(level);
 };
 
-const formatGasValue = (value?: number) => (
-  typeof value === 'number' && Number.isFinite(value) ? String(value) : 'N/A'
-);
 const formatMotorValue = (value?: number) => (typeof value === 'number' ? value : 0);
 
 const BatteryIndicator = ({ title, value }: { title: string; value: number }) => {
@@ -287,7 +285,7 @@ const Dashboard = () => {
               <div className="text-right">
                 <p className="text-muted-foreground text-sm mb-1">Concentration</p>
                 <p className="text-3xl font-bold font-mono text-primary transition-all duration-300">
-                  {formatGasValue(status.gasConcentration)}
+                  {formatGasPpm(status.gasConcentration)}
                   <span className="text-lg text-muted-foreground ml-1">ppm</span>
                 </p>
               </div>
@@ -341,21 +339,21 @@ const Dashboard = () => {
                 <div className="p-3 rounded-lg bg-muted/40 border border-border">
                   <p className="text-xs text-muted-foreground mb-1">CO2</p>
                   <p className="text-xl font-bold font-mono text-foreground">
-                    {latestReading?.co2Valid === false ? 'Invalid' : formatGasValue(latestReading?.co2)}
+                    {latestReading?.co2Valid === false ? 'Invalid' : formatGasPpm(latestReading?.co2)}
                     {latestReading?.co2Valid !== false && <span className="text-sm text-muted-foreground"> ppm</span>}
                   </p>
                 </div>
                 <div className="p-3 rounded-lg bg-muted/40 border border-border">
                   <p className="text-xs text-muted-foreground mb-1">CO</p>
-                  <p className="text-xl font-bold font-mono text-foreground">{formatGasValue(latestReading?.co)} <span className="text-sm text-muted-foreground">ppm</span></p>
+                  <p className="text-xl font-bold font-mono text-foreground">{formatGasPpm(latestReading?.co)} <span className="text-sm text-muted-foreground">ppm</span></p>
                 </div>
                 <div className="p-3 rounded-lg bg-muted/40 border border-border">
                   <p className="text-xs text-muted-foreground mb-1">LPG</p>
-                  <p className="text-xl font-bold font-mono text-foreground">{formatGasValue(latestReading?.lpg)} <span className="text-sm text-muted-foreground">ppm</span></p>
+                  <p className="text-xl font-bold font-mono text-foreground">{formatGasPpm(latestReading?.lpg)} <span className="text-sm text-muted-foreground">ppm</span></p>
                 </div>
                 <div className="p-3 rounded-lg bg-muted/40 border border-border">
                   <p className="text-xs text-muted-foreground mb-1">H2S</p>
-                  <p className="text-xl font-bold font-mono text-foreground">{formatGasValue(latestReading?.h2s)} <span className="text-sm text-muted-foreground">ppm</span></p>
+                  <p className="text-xl font-bold font-mono text-foreground">{formatGasPpm(latestReading?.h2s)} <span className="text-sm text-muted-foreground">ppm</span></p>
                 </div>
               </div>
 
