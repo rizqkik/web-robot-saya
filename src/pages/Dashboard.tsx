@@ -70,7 +70,9 @@ const getModalDangerLevelColor = (level: AreaModalLevel) => {
   return getDangerLevelColor(level);
 };
 
-const formatGasValue = (value?: number) => (typeof value === 'number' ? value.toFixed(2) : 'N/A');
+const formatGasValue = (value?: number) => (
+  typeof value === 'number' && Number.isFinite(value) ? String(value) : 'N/A'
+);
 const formatMotorValue = (value?: number) => (typeof value === 'number' ? value : 0);
 
 const BatteryIndicator = ({ title, value }: { title: string; value: number }) => {
@@ -285,7 +287,7 @@ const Dashboard = () => {
               <div className="text-right">
                 <p className="text-muted-foreground text-sm mb-1">Concentration</p>
                 <p className="text-3xl font-bold font-mono text-primary transition-all duration-300">
-                  {status.gasConcentration.toFixed(2)}
+                  {formatGasValue(status.gasConcentration)}
                   <span className="text-lg text-muted-foreground ml-1">ppm</span>
                 </p>
               </div>

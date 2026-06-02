@@ -16,7 +16,9 @@ const GasDataTable = ({ data }: GasDataTableProps) => {
   // Only show the latest 10 readings
   const displayData = data.slice(0, 10);
 
-  const formatGasValue = (value: number, digits: number) => value.toFixed(digits);
+  const formatGasValue = (value?: number) => (
+    typeof value === 'number' && Number.isFinite(value) ? String(value) : 'N/A'
+  );
 
   return (
     <div className="rounded-lg border border-border overflow-hidden overflow-x-auto">
@@ -46,12 +48,12 @@ const GasDataTable = ({ data }: GasDataTableProps) => {
                 {reading.co2Valid === false ? (
                   <span className="text-muted-foreground">Invalid</span>
                 ) : (
-                  formatGasValue(reading.co2, 1)
+                  formatGasValue(reading.co2)
                 )}
               </TableCell>
-              <TableCell className="data-cell text-right">{formatGasValue(reading.co, 3)}</TableCell>
-              <TableCell className="data-cell text-right">{formatGasValue(reading.lpg, 3)}</TableCell>
-              <TableCell className="data-cell text-right">{formatGasValue(reading.h2s, 6)}</TableCell>
+              <TableCell className="data-cell text-right">{formatGasValue(reading.co)}</TableCell>
+              <TableCell className="data-cell text-right">{formatGasValue(reading.lpg)}</TableCell>
+              <TableCell className="data-cell text-right">{formatGasValue(reading.h2s)}</TableCell>
               <TableCell className="text-center">
                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusBgClass(reading.status)}`}>
                   {reading.status.toUpperCase()}
