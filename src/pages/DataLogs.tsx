@@ -1,4 +1,4 @@
-import { Activity, Download, RefreshCw, Pause, Play } from 'lucide-react';
+import { Activity, Download, RefreshCw } from 'lucide-react';
 import GasDataTable from '@/components/GasDataTable';
 import ConnectionStatus from '@/components/ConnectionStatus';
 import { useSensorData } from '@/contexts/SensorDataContext';
@@ -6,7 +6,7 @@ import { getWorstStatus } from '@/data/mockData';
 import { Button } from '@/components/ui/button';
 
 const DataLogs = () => {
-  const { readings, isConnected, lastUpdate, connect, disconnect, isAutoUpdating, toggleRefresh } = useSensorData();
+  const { readings, isConnected, lastUpdate, isAutoUpdating, toggleRefresh } = useSensorData();
   const worstStatus = readings.length > 0 ? getWorstStatus(readings) : 'Safe';
 
   const dangerousCount = readings.filter(r => r.status === 'Dangerous' || r.status === 'High').length;

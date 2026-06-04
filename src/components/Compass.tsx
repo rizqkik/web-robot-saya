@@ -46,8 +46,8 @@ const Compass = ({ direction }: CompassProps) => {
               isActive ? 'text-primary scale-110' : 'text-muted-foreground'
             }`}
             style={{
-              left: `${x}%`,
-              top: `${y}%`,
+              insetInlineStart: `${x}%`,
+              insetBlockStart: `${y}%`,
               transform: 'translate(-50%, -50%)',
             } as React.CSSProperties}
           >
