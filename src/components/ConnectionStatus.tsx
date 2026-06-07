@@ -1,11 +1,8 @@
 import { Wifi, WifiOff, RefreshCw, AlertCircle } from 'lucide-react';
 import { useSensorData } from '@/contexts/SensorDataContext';
-import { getBackendConfig, getBackendHelpText } from '@/lib/backendConfig';
 
 const ConnectionStatus = () => {
   const { isConnected, lastUpdate, connectionError, connect, disconnect } = useSensorData();
-  const { backendHost } = getBackendConfig();
-  const backendHelpText = getBackendHelpText();
 
   const formatTime = (date: Date | null) => {
     if (!date) return 'Never';
@@ -37,12 +34,8 @@ const ConnectionStatus = () => {
       {/* Error message */}
       {connectionError && (
         <div className="min-w-0 flex-1 basis-full sm:basis-auto">
-          <p className="text-xs text-destructive">
-            {connectionError} - using simulated data
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Backend: {backendHost || 'unknown'}
-            {backendHelpText ? ` - ${backendHelpText}` : ''}
+          <p className="text-xs font-medium text-destructive">
+            Connection Shutdown
           </p>
         </div>
       )}
