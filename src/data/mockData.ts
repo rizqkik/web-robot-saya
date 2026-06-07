@@ -21,8 +21,8 @@ export interface RobotStatus {
   gasConcentration: number;
   isEvacuationNeeded: boolean;
   controlConnected?: boolean;
-  motorLeft?: number;
-  motorRight?: number;
+  motorDrive?: number;
+  motorSteer?: number;
   controlAgeMs?: number | null;
 }
 

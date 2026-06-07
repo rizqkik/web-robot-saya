@@ -16,15 +16,18 @@ interface IncomingSensorData {
     area_level: string;
     details?: Record<string, string>;
   };
-  battery: {
+  battery?: {
     robot: number;
   } | number;
+  battery_robot?: number;
   orientation?: number | string;
   co2_valid?: boolean;
   control_connected?: boolean;
   control_age_ms?: number;
   motor_left?: number;
   motor_right?: number;
+  motor_drive?: number;
+  motor_steer?: number;
 }
 
 const normalizeHeading = (value?: number | string): number => {
@@ -98,8 +101,8 @@ const generateRobotStatus = (readings: GasReading[], latestData?: IncomingSensor
     gasConcentration,
     isEvacuationNeeded: levelArea === 'High' || levelArea === 'Dangerous',
     controlConnected: latestData?.control_connected,
-    motorLeft: latestData?.motor_left,
-    motorRight: latestData?.motor_right,
+    motorDrive: latestData?.motor_drive ?? latestData?.motor_left,
+    motorSteer: latestData?.motor_steer ?? latestData?.motor_right,
     controlAgeMs: latestData?.control_age_ms ?? null,
   };
 };
@@ -145,7 +148,7 @@ export const useRealtimeSensorData = (options: UseRealtimeSensorDataOptions = {}
 
     const batteryRobot = typeof data.battery === 'number'
       ? data.battery
-      : data.battery?.robot;
+      : data.battery?.robot ?? data.battery_robot;
 
     setBattery(typeof batteryRobot === 'number' ? batteryRobot : null);
     setLastUpdate(new Date());

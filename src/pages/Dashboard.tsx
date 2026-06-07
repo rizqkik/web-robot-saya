@@ -5,27 +5,32 @@ import VideoFeed from '@/components/VideoFeed';
 import AlertBanner from '@/components/AlertBanner';
 import ConnectionStatus from '@/components/ConnectionStatus';
 import { useSensorData } from '@/contexts/SensorDataContext';
-import { GasReading, getDangerLevelColor } from '@/data/mockData';
+import { DangerLevel, getDangerLevelColor } from '@/data/mockData';
 import { getBackendConfig } from '@/lib/backendConfig';
 import { formatGasPpm } from '@/lib/utils';
 
 const LEVEL_MODAL_INTERVAL_MS = 5 * 60 * 1000;
 
-type BatteryStatus = 'Full' | 'Good' | 'Low' | 'Critical';
-type AreaModalLevel = 'Unknown' | 'Safe' | 'Moderate' | 'High' | 'Dangerous' | 'Critical';
+type BatteryStatus = 'Full' | 'Good' | 'Low' | 'Critical' | 'Unknown';
 
-const getRandomBatteryValue = () => Math.floor(Math.random() * 101);
-
-const clampBatteryValue = (value: number) => Math.min(Math.max(value, 0), 100);
-
-const getBatteryStatus = (value: number): BatteryStatus => {
+const getBatteryStatus = (value?: number | null): BatteryStatus => {
+  if (typeof value !== 'number') return 'Unknown';
   if (value > 90) return 'Full';
   if (value > 60) return 'Good';
   if (value >= 30) return 'Low';
   return 'Critical';
 };
 
-const getBatteryClasses = (value: number) => {
+const getBatteryClasses = (value?: number | null) => {
+  if (typeof value !== 'number') {
+    return {
+      bar: 'bg-muted-foreground',
+      text: 'text-muted-foreground',
+      border: 'border-border',
+      background: 'bg-muted/30',
+    };
+  }
+
   if (value > 60) {
     return {
       bar: 'bg-success',
@@ -52,37 +57,20 @@ const getBatteryClasses = (value: number) => {
   };
 };
 
-const getModalDangerLevel = (currentStatus: string, latestReading?: GasReading): AreaModalLevel => {
-  if (latestReading && (latestReading.co2 > 1000 || latestReading.co > 10 || latestReading.lpg > 1000 || latestReading.h2s > 1.5)) {
-    return 'Critical';
-  }
+const formatMotorValue = (value?: number) => (typeof value === 'number' ? value : 'N/A');
 
-  if (currentStatus === 'Unknown') return 'Unknown';
-  if (currentStatus === 'Low') return 'Moderate';
-  if (currentStatus === 'Safe' || currentStatus === 'Moderate' || currentStatus === 'High' || currentStatus === 'Dangerous') {
-    return currentStatus;
-  }
-
-  return 'Safe';
-};
-
-const getModalDangerLevelColor = (level: AreaModalLevel) => {
-  if (level === 'Critical') return 'text-destructive';
-  return getDangerLevelColor(level);
-};
-
-const formatMotorValue = (value?: number) => (typeof value === 'number' ? value : 0);
-
-const BatteryIndicator = ({ title, value }: { title: string; value: number }) => {
+const BatteryIndicator = ({ title, value }: { title: string; value?: number | null }) => {
   const status = getBatteryStatus(value);
   const classes = getBatteryClasses(value);
+  const displayValue = typeof value === 'number' ? `${value}%` : 'N/A';
+  const barWidth = typeof value === 'number' ? value : 0;
 
   return (
     <div className={`p-4 rounded-lg bg-card border ${classes.border} transition-all duration-300`}>
       <div className="flex items-center justify-between gap-3 mb-4">
         <div>
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{title}</p>
-          <p className={`text-2xl font-bold font-mono ${classes.text}`}>{value}%</p>
+          <p className={`text-2xl font-bold font-mono ${classes.text}`}>{displayValue}</p>
         </div>
         <div className={`p-2 rounded-lg border ${classes.border} ${classes.background}`}>
           <Battery className={`w-5 h-5 ${classes.text}`} />
@@ -92,7 +80,7 @@ const BatteryIndicator = ({ title, value }: { title: string; value: number }) =>
       <div className="h-3 bg-muted rounded-full overflow-hidden mb-3">
         <div
           className={`h-full rounded-full transition-all duration-500 ${classes.bar}`}
-          style={{ width: `${value}%` }}
+          style={{ width: `${barWidth}%` }}
         />
       </div>
 
@@ -107,23 +95,14 @@ const BatteryIndicator = ({ title, value }: { title: string; value: number }) =>
 const Dashboard = () => {
   const { readings, robotStatus, isConnected, battery } = useSensorData();
   const { videoFeedUrl } = getBackendConfig();
-  const [simRobotBattery, setSimRobotBattery] = useState(getRandomBatteryValue);
   const [isLevelModalOpen, setIsLevelModalOpen] = useState(false);
   const [levelModalTimestamp, setLevelModalTimestamp] = useState(() => new Date().toLocaleString());
 
-  const currentStatus = robotStatus?.levelArea ?? 'Safe';
+  const currentStatus: DangerLevel = robotStatus?.levelArea ?? 'Safe';
   const isHighDanger = currentStatus === 'High' || currentStatus === 'Dangerous';
   const isUnknownStatus = currentStatus === 'Unknown';
   const latestReading = readings[0];
-  const modalDangerLevel = getModalDangerLevel(currentStatus, latestReading);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setSimRobotBattery((previousValue) => clampBatteryValue(previousValue + Math.floor(Math.random() * 7) - 3));
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, []);
+  const modalDangerLevel = currentStatus;
 
   useEffect(() => {
     const showLevelModal = () => {
@@ -137,8 +116,6 @@ const Dashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const robotBatteryValue = battery ?? simRobotBattery;
-
   const status = robotStatus || {
     direction: 0,
     gasLocation: 'Awaiting data...',
@@ -148,8 +125,8 @@ const Dashboard = () => {
     gasConcentration: 0,
     isEvacuationNeeded: false,
     controlConnected: false,
-    motorLeft: 0,
-    motorRight: 0,
+    motorDrive: undefined,
+    motorSteer: undefined,
     controlAgeMs: null,
   };
 
@@ -181,7 +158,7 @@ const Dashboard = () => {
 
           {/* Battery Status */}
           <div className="grid grid-cols-1 gap-4">
-            <BatteryIndicator title="Robot Battery" value={robotBatteryValue} />
+            <BatteryIndicator title="Robot Battery" value={battery} />
           </div>
 
           {/* Robot Control Status */}
@@ -210,12 +187,12 @@ const Dashboard = () => {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-lg bg-muted/40 border border-border p-3">
-                <p className="text-xs text-muted-foreground mb-1">Left Motor</p>
-                <p className="text-xl font-bold font-mono text-foreground">{formatMotorValue(status.motorLeft)}</p>
+                <p className="text-xs text-muted-foreground mb-1">Drive Motor</p>
+                <p className="text-xl font-bold font-mono text-foreground">{formatMotorValue(status.motorDrive)}</p>
               </div>
               <div className="rounded-lg bg-muted/40 border border-border p-3">
-                <p className="text-xs text-muted-foreground mb-1">Right Motor</p>
-                <p className="text-xl font-bold font-mono text-foreground">{formatMotorValue(status.motorRight)}</p>
+                <p className="text-xs text-muted-foreground mb-1">Steering Motor</p>
+                <p className="text-xl font-bold font-mono text-foreground">{formatMotorValue(status.motorSteer)}</p>
               </div>
             </div>
           </div>
@@ -320,7 +297,7 @@ const Dashboard = () => {
             <div className="flex items-center justify-between p-5 border-b border-border">
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Level Area Status</p>
-                <h3 className={`text-2xl font-bold ${getModalDangerLevelColor(modalDangerLevel)}`}>
+                <h3 className={`text-2xl font-bold ${getDangerLevelColor(modalDangerLevel)}`}>
                   {modalDangerLevel}
                 </h3>
               </div>
