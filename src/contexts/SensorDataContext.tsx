@@ -21,7 +21,6 @@ export const SensorDataProvider = ({ children }: { children: ReactNode }) => {
   const sensorData = useRealtimeSensorData({
     maxReadings: 20,
     reconnectInterval: 5000,
-    enableSimulation: true, // Fallback to simulation if WebSocket fails
   });
 
   return (

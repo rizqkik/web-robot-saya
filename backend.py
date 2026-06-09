@@ -34,16 +34,15 @@ def get_latest_sensor_data():
         LIMIT 1
     """)
     result = cursor.fetchone()
-    cursor.close()
-    conn.close()
     if result:
-        # Create dict from result
         columns = [desc[0] for desc in cursor.description]
         data = dict(zip(columns, result))
-        # Convert timestamp to ISO format string
         data['timestamp'] = data['timestamp'].isoformat()
-        print(f"Backend sending data: {data}")  # Debug log
+        cursor.close()
+        conn.close()
         return data
+    cursor.close()
+    conn.close()
     return None
 
 def get_sensor_history(limit=20):

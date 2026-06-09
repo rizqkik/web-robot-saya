@@ -5,12 +5,44 @@ import { useSensorData } from '@/contexts/SensorDataContext';
 import { getWorstStatus } from '@/data/mockData';
 import { Button } from '@/components/ui/button';
 
+const csvEscape = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+
 const DataLogs = () => {
   const { readings, isConnected, lastUpdate, isAutoUpdating, toggleRefresh } = useSensorData();
   const worstStatus = readings.length > 0 ? getWorstStatus(readings) : 'Safe';
 
   const dangerousCount = readings.filter(r => r.status === 'Dangerous' || r.status === 'High').length;
   const safeCount = readings.filter(r => r.status === 'Safe' || r.status === 'Low').length;
+
+  const exportReadings = () => {
+    if (readings.length === 0) return;
+
+    const headers = ['ID', 'Timestamp', 'CO2 (PPM)', 'CO2 Valid', 'CO (PPM)', 'LPG (PPM)', 'H2S (PPM)', 'Status'];
+    const rows = readings.map((reading) => [
+      reading.id,
+      reading.timestamp,
+      reading.co2Valid === false ? 'Invalid' : reading.co2,
+      reading.co2Valid === false ? 'No' : 'Yes',
+      reading.co,
+      reading.lpg,
+      reading.h2s,
+      reading.status,
+    ]);
+
+    const csv = [headers, ...rows]
+      .map((row) => row.map(csvEscape).join(','))
+      .join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+    link.href = url;
+    link.download = `robot-rescue-gas-logs-${timestamp}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -37,7 +69,13 @@ const DataLogs = () => {
             <RefreshCw className="w-4 h-4" />
             {isAutoUpdating ? 'Stop Refresh' : 'Refresh'}
           </Button>
-          <Button variant="outline" size="sm" className="gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            disabled={readings.length === 0}
+            onClick={exportReadings}
+          >
             <Download className="w-4 h-4" />
             Export
           </Button>

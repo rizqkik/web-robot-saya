@@ -20,7 +20,36 @@ interface IncomingSensorData {
     robot: number;
   } | number;
   battery_robot?: number;
-  orientation?: number | string;
+  orientation?: number | string | {
+    yaw?: number | string;
+    pitch?: number | string;
+    roll?: number | string;
+    x?: number | string;
+    y?: number | string;
+    z?: number | string;
+  };
+  imu?: {
+    yaw?: number | string;
+    pitch?: number | string;
+    roll?: number | string;
+    x?: number | string;
+    y?: number | string;
+    z?: number | string;
+  };
+  mpu?: {
+    yaw?: number | string;
+    pitch?: number | string;
+    roll?: number | string;
+    x?: number | string;
+    y?: number | string;
+    z?: number | string;
+  };
+  yaw?: number | string;
+  pitch?: number | string;
+  roll?: number | string;
+  yaw_deg?: number | string;
+  pitch_deg?: number | string;
+  roll_deg?: number | string;
   co2_valid?: boolean;
   control_connected?: boolean;
   control_age_ms?: number;
@@ -30,10 +59,63 @@ interface IncomingSensorData {
   motor_steer?: number;
 }
 
-const normalizeHeading = (value?: number | string): number => {
+const toFiniteNumber = (value?: number | string | null): number | null => {
   const numericValue = Number(value);
-  if (!Number.isFinite(numericValue)) return 0;
+  return Number.isFinite(numericValue) ? numericValue : null;
+};
+
+const normalizeHeading = (value?: number | string | null): number => {
+  const numericValue = toFiniteNumber(value);
+  if (numericValue === null) return 0;
   return Math.round(((numericValue % 360) + 360) % 360);
+};
+
+const normalizeTilt = (value?: number | string | null): number => {
+  const numericValue = toFiniteNumber(value);
+  if (numericValue === null) return 0;
+  return Math.round(Math.min(90, Math.max(-90, numericValue)));
+};
+
+const getNestedOrientationValue = (
+  source: IncomingSensorData['orientation'] | IncomingSensorData['imu'] | IncomingSensorData['mpu'],
+  preferredKey: 'yaw' | 'pitch' | 'roll',
+  fallbackKey: 'x' | 'y' | 'z',
+) => {
+  if (!source || typeof source !== 'object') return null;
+  return source[preferredKey] ?? source[fallbackKey] ?? null;
+};
+
+const extractOrientation = (data?: IncomingSensorData) => {
+  const orientation = data?.orientation;
+  const orientationObject = typeof orientation === 'object' ? orientation : undefined;
+
+  const yaw =
+    data?.yaw ??
+    data?.yaw_deg ??
+    getNestedOrientationValue(orientationObject, 'yaw', 'z') ??
+    getNestedOrientationValue(data?.imu, 'yaw', 'z') ??
+    getNestedOrientationValue(data?.mpu, 'yaw', 'z') ??
+    (typeof orientation === 'number' || typeof orientation === 'string' ? orientation : null);
+
+  const pitch =
+    data?.pitch ??
+    data?.pitch_deg ??
+    getNestedOrientationValue(orientationObject, 'pitch', 'x') ??
+    getNestedOrientationValue(data?.imu, 'pitch', 'x') ??
+    getNestedOrientationValue(data?.mpu, 'pitch', 'x');
+
+  const roll =
+    data?.roll ??
+    data?.roll_deg ??
+    getNestedOrientationValue(orientationObject, 'roll', 'y') ??
+    getNestedOrientationValue(data?.imu, 'roll', 'y') ??
+    getNestedOrientationValue(data?.mpu, 'roll', 'y');
+
+  return {
+    yaw: normalizeHeading(yaw),
+    pitch: normalizeTilt(pitch),
+    roll: normalizeTilt(roll),
+  };
 };
 
 const normalizeDangerLevel = (value?: string): DangerLevel => {
@@ -75,6 +157,7 @@ const generateRobotStatus = (readings: GasReading[], latestData?: IncomingSensor
   const latestReading = readings[0];
   const worstStatus = getWorstStatus(readings);
   const levelArea = latestData ? normalizeDangerLevel(latestData.prediction?.area_level) : worstStatus;
+  const orientation = extractOrientation(latestData);
 
   let mostDetectedGas = 'LPG';
   let gasConcentration = latestReading?.lpg ?? 0;
@@ -93,7 +176,10 @@ const generateRobotStatus = (readings: GasReading[], latestData?: IncomingSensor
   }
 
   return {
-    direction: normalizeHeading(latestData?.orientation),
+    direction: orientation.yaw,
+    yaw: orientation.yaw,
+    pitch: orientation.pitch,
+    roll: orientation.roll,
     gasLocation: 'Sector A-1',
     distance: 10.0,
     levelArea,
@@ -110,7 +196,6 @@ const generateRobotStatus = (readings: GasReading[], latestData?: IncomingSensor
 interface UseRealtimeSensorDataOptions {
   maxReadings?: number;
   reconnectInterval?: number;
-  enableSimulation?: boolean;
 }
 
 export const useRealtimeSensorData = (options: UseRealtimeSensorDataOptions = {}) => {

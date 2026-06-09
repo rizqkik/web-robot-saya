@@ -14,6 +14,9 @@ export interface GasReading {
 
 export interface RobotStatus {
   direction: number; // 0-360 degrees
+  yaw: number;
+  pitch: number;
+  roll: number;
   gasLocation: string;
   distance: number;
   levelArea: DangerLevel;
@@ -41,6 +44,9 @@ export const mockGasReadings: GasReading[] = [
 
 export const mockRobotStatus: RobotStatus = {
   direction: 45, // NE
+  yaw: 45,
+  pitch: 8,
+  roll: -6,
   gasLocation: 'Sector B-4',
   distance: 12.5,
   levelArea: 'High',

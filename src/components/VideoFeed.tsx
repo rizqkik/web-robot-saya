@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Video, VideoOff, Signal } from 'lucide-react';
 
 interface VideoFeedProps {
@@ -6,15 +7,33 @@ interface VideoFeedProps {
 }
 
 const VideoFeed = ({ isActive = false, streamUrl }: VideoFeedProps) => {
+  const [isStreamLoaded, setIsStreamLoaded] = useState(false);
+  const [hasStreamError, setHasStreamError] = useState(false);
+
+  useEffect(() => {
+    setIsStreamLoaded(false);
+    setHasStreamError(false);
+  }, [streamUrl, isActive]);
+
+  const showStream = isActive && streamUrl && !hasStreamError;
+  const isCameraConnected = Boolean(showStream && isStreamLoaded);
+
   return (
     <div className="relative aspect-video bg-card rounded-lg border border-border overflow-hidden">
       {/* Video element if active and stream available */}
-      {isActive && streamUrl ? (
+      {showStream ? (
         <img
           src={streamUrl}
           alt="Camera feed"
           className="w-full h-full object-cover"
-          onError={() => console.error('Video stream failed to load')}
+          onLoad={() => {
+            setIsStreamLoaded(true);
+            setHasStreamError(false);
+          }}
+          onError={() => {
+            setIsStreamLoaded(false);
+            setHasStreamError(true);
+          }}
         />
       ) : (
         <>
@@ -29,10 +48,10 @@ const VideoFeed = ({ isActive = false, streamUrl }: VideoFeedProps) => {
 
           {/* Content */}
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-            {isActive ? (
+            {isActive && streamUrl ? (
               <>
                 <Video className="w-12 h-12 text-primary" />
-                <span className="text-muted-foreground text-sm">Live Feed Active</span>
+                <span className="text-muted-foreground text-sm">Camera stream unavailable</span>
               </>
             ) : (
               <>
@@ -46,13 +65,13 @@ const VideoFeed = ({ isActive = false, streamUrl }: VideoFeedProps) => {
 
       {/* Status indicator */}
       <div className="absolute top-3 right-3 flex items-center gap-2 px-2 py-1 rounded bg-card/80 backdrop-blur-sm border border-border">
-        <Signal className={`w-4 h-4 ${isActive ? 'text-success' : 'text-destructive'}`} />
-        <span className="text-xs font-mono">{isActive ? 'CONNECTED' : 'NO SIGNAL'}</span>
+        <Signal className={`w-4 h-4 ${isCameraConnected ? 'text-success' : 'text-destructive'}`} />
+        <span className="text-xs font-mono">{isCameraConnected ? 'CONNECTED' : 'NO SIGNAL'}</span>
       </div>
 
       {/* Recording indicator */}
       <div className="absolute top-3 left-3 flex items-center gap-2 px-2 py-1 rounded bg-card/80 backdrop-blur-sm border border-border">
-        <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-destructive animate-pulse' : 'bg-muted-foreground'}`} />
+        <div className={`w-2 h-2 rounded-full ${isCameraConnected ? 'bg-destructive animate-pulse' : 'bg-muted-foreground'}`} />
         <span className="text-xs font-mono">REC</span>
       </div>
     </div>

@@ -118,6 +118,9 @@ const Dashboard = () => {
 
   const status = robotStatus || {
     direction: 0,
+    yaw: 0,
+    pitch: 0,
+    roll: 0,
     gasLocation: 'Awaiting data...',
     distance: 0,
     levelArea: 'Safe' as const,
@@ -145,7 +148,7 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Column - Navigation & Status */}
         <div className="space-y-6">
-          {/* Compass Card */}
+          {/* Robot Attitude Card */}
           <div className="p-6 rounded-lg bg-card border border-border relative overflow-hidden">
             <div className={`absolute inset-0 transition-opacity duration-500 ${
               isConnected ? 'opacity-0' : 'opacity-50 bg-background'
@@ -153,7 +156,12 @@ const Dashboard = () => {
             <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-6">
               Robot Orientation
             </h2>
-            <Compass direction={status.direction} />
+            <Compass
+              direction={status.direction}
+              yaw={status.yaw}
+              pitch={status.pitch}
+              roll={status.roll}
+            />
           </div>
 
           {/* Battery Status */}
