@@ -43,13 +43,29 @@ interface IncomingSensorData {
     x?: number | string;
     y?: number | string;
     z?: number | string;
+    angle_x?: number | string;
+    angle_y?: number | string;
+    angle_z?: number | string;
+    gyro_x?: number | string;
+    gyro_y?: number | string;
+    gyro_z?: number | string;
   };
+  mpu6050?: Record<string, number | string>;
+  gyro?: Record<string, number | string>;
+  gyroscope?: Record<string, number | string>;
+  attitude?: Record<string, number | string>;
   yaw?: number | string;
   pitch?: number | string;
   roll?: number | string;
   yaw_deg?: number | string;
   pitch_deg?: number | string;
   roll_deg?: number | string;
+  angle_x?: number | string;
+  angle_y?: number | string;
+  angle_z?: number | string;
+  gyro_x?: number | string;
+  gyro_y?: number | string;
+  gyro_z?: number | string;
   co2_valid?: boolean;
   control_connected?: boolean;
   control_age_ms?: number;
@@ -77,12 +93,22 @@ const normalizeTilt = (value?: number | string | null): number => {
 };
 
 const getNestedOrientationValue = (
-  source: IncomingSensorData['orientation'] | IncomingSensorData['imu'] | IncomingSensorData['mpu'],
+  source: IncomingSensorData['orientation'] | IncomingSensorData['imu'] | IncomingSensorData['mpu'] | Record<string, number | string> | undefined,
   preferredKey: 'yaw' | 'pitch' | 'roll',
-  fallbackKey: 'x' | 'y' | 'z',
+  fallbackKeys: string[],
 ) => {
   if (!source || typeof source !== 'object') return null;
-  return source[preferredKey] ?? source[fallbackKey] ?? null;
+  const normalized = Object.entries(source).reduce<Record<string, number | string>>((result, [key, value]) => {
+    result[key.toLowerCase()] = value;
+    return result;
+  }, {});
+
+  for (const key of [preferredKey, ...fallbackKeys]) {
+    const value = normalized[key.toLowerCase()];
+    if (value !== undefined && value !== null) return value;
+  }
+
+  return null;
 };
 
 const extractOrientation = (data?: IncomingSensorData) => {
@@ -92,24 +118,42 @@ const extractOrientation = (data?: IncomingSensorData) => {
   const yaw =
     data?.yaw ??
     data?.yaw_deg ??
-    getNestedOrientationValue(orientationObject, 'yaw', 'z') ??
-    getNestedOrientationValue(data?.imu, 'yaw', 'z') ??
-    getNestedOrientationValue(data?.mpu, 'yaw', 'z') ??
+    data?.angle_z ??
+    data?.gyro_z ??
+    getNestedOrientationValue(orientationObject, 'yaw', ['z', 'heading', 'angle_z', 'gyro_z']) ??
+    getNestedOrientationValue(data?.imu, 'yaw', ['z', 'heading', 'angle_z', 'gyro_z']) ??
+    getNestedOrientationValue(data?.mpu, 'yaw', ['z', 'heading', 'angle_z', 'gyro_z']) ??
+    getNestedOrientationValue(data?.mpu6050, 'yaw', ['z', 'heading', 'angle_z', 'gyro_z']) ??
+    getNestedOrientationValue(data?.gyro, 'yaw', ['z', 'heading', 'angle_z', 'gyro_z']) ??
+    getNestedOrientationValue(data?.gyroscope, 'yaw', ['z', 'heading', 'angle_z', 'gyro_z']) ??
+    getNestedOrientationValue(data?.attitude, 'yaw', ['z', 'heading', 'angle_z']) ??
     (typeof orientation === 'number' || typeof orientation === 'string' ? orientation : null);
 
   const pitch =
     data?.pitch ??
     data?.pitch_deg ??
-    getNestedOrientationValue(orientationObject, 'pitch', 'x') ??
-    getNestedOrientationValue(data?.imu, 'pitch', 'x') ??
-    getNestedOrientationValue(data?.mpu, 'pitch', 'x');
+    data?.angle_x ??
+    data?.gyro_x ??
+    getNestedOrientationValue(orientationObject, 'pitch', ['x', 'angle_x', 'gyro_x']) ??
+    getNestedOrientationValue(data?.imu, 'pitch', ['x', 'angle_x', 'gyro_x']) ??
+    getNestedOrientationValue(data?.mpu, 'pitch', ['x', 'angle_x', 'gyro_x']) ??
+    getNestedOrientationValue(data?.mpu6050, 'pitch', ['x', 'angle_x', 'gyro_x']) ??
+    getNestedOrientationValue(data?.gyro, 'pitch', ['x', 'angle_x', 'gyro_x']) ??
+    getNestedOrientationValue(data?.gyroscope, 'pitch', ['x', 'angle_x', 'gyro_x']) ??
+    getNestedOrientationValue(data?.attitude, 'pitch', ['x', 'angle_x']);
 
   const roll =
     data?.roll ??
     data?.roll_deg ??
-    getNestedOrientationValue(orientationObject, 'roll', 'y') ??
-    getNestedOrientationValue(data?.imu, 'roll', 'y') ??
-    getNestedOrientationValue(data?.mpu, 'roll', 'y');
+    data?.angle_y ??
+    data?.gyro_y ??
+    getNestedOrientationValue(orientationObject, 'roll', ['y', 'angle_y', 'gyro_y']) ??
+    getNestedOrientationValue(data?.imu, 'roll', ['y', 'angle_y', 'gyro_y']) ??
+    getNestedOrientationValue(data?.mpu, 'roll', ['y', 'angle_y', 'gyro_y']) ??
+    getNestedOrientationValue(data?.mpu6050, 'roll', ['y', 'angle_y', 'gyro_y']) ??
+    getNestedOrientationValue(data?.gyro, 'roll', ['y', 'angle_y', 'gyro_y']) ??
+    getNestedOrientationValue(data?.gyroscope, 'roll', ['y', 'angle_y', 'gyro_y']) ??
+    getNestedOrientationValue(data?.attitude, 'roll', ['y', 'angle_y']);
 
   return {
     yaw: normalizeHeading(yaw),

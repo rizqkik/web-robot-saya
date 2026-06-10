@@ -72,15 +72,47 @@ def first_present(*values):
     return None
 
 
+def get_case_insensitive(source, keys):
+    if not isinstance(source, dict):
+        return None
+
+    normalized = {str(key).lower(): value for key, value in source.items()}
+    for key in keys:
+        value = normalized.get(str(key).lower())
+        if value is not None:
+            return value
+
+    return None
+
+
 def has_orientation_payload(payload):
     if not isinstance(payload, dict):
         return False
 
-    direct_keys = ("yaw", "pitch", "roll", "yaw_deg", "pitch_deg", "roll_deg")
-    if any(payload.get(key) is not None for key in direct_keys):
+    direct_keys = (
+        "yaw",
+        "pitch",
+        "roll",
+        "yaw_deg",
+        "pitch_deg",
+        "roll_deg",
+        "angle_x",
+        "angle_y",
+        "angle_z",
+        "gyro_x",
+        "gyro_y",
+        "gyro_z",
+        "x",
+        "y",
+        "z",
+    )
+    if get_case_insensitive(payload, direct_keys) is not None:
         return True
 
-    return any(isinstance(payload.get(key), dict) for key in ("orientation", "imu", "mpu"))
+    return any(
+        isinstance(payload.get(key), dict)
+        for key in ("orientation", "imu", "mpu", "mpu6050", "gyro", "gyroscope", "attitude")
+    )
 
 
 def extract_orientation(payload):
@@ -90,27 +122,40 @@ def extract_orientation(payload):
     orientation = payload.get("orientation")
     imu = payload.get("imu")
     mpu = payload.get("mpu")
+    mpu6050 = payload.get("mpu6050")
+    gyro = payload.get("gyro")
+    gyroscope = payload.get("gyroscope")
+    attitude = payload.get("attitude")
 
     yaw = first_present(
-        payload.get("yaw"),
-        payload.get("yaw_deg"),
+        get_case_insensitive(payload, ["yaw", "yaw_deg", "heading", "angle_z", "gyro_z", "z"]),
         get_nested_value(orientation, ["yaw", "z"]),
         get_nested_value(imu, ["yaw", "z"]),
         get_nested_value(mpu, ["yaw", "z"]),
+        get_nested_value(mpu6050, ["yaw", "z", "angle_z", "gyro_z"]),
+        get_nested_value(gyro, ["yaw", "z", "angle_z", "gyro_z"]),
+        get_nested_value(gyroscope, ["yaw", "z", "angle_z", "gyro_z"]),
+        get_nested_value(attitude, ["yaw", "z", "angle_z"]),
     )
     pitch = first_present(
-        payload.get("pitch"),
-        payload.get("pitch_deg"),
+        get_case_insensitive(payload, ["pitch", "pitch_deg", "angle_x", "gyro_x", "x"]),
         get_nested_value(orientation, ["pitch", "x"]),
         get_nested_value(imu, ["pitch", "x"]),
         get_nested_value(mpu, ["pitch", "x"]),
+        get_nested_value(mpu6050, ["pitch", "x", "angle_x", "gyro_x"]),
+        get_nested_value(gyro, ["pitch", "x", "angle_x", "gyro_x"]),
+        get_nested_value(gyroscope, ["pitch", "x", "angle_x", "gyro_x"]),
+        get_nested_value(attitude, ["pitch", "x", "angle_x"]),
     )
     roll = first_present(
-        payload.get("roll"),
-        payload.get("roll_deg"),
+        get_case_insensitive(payload, ["roll", "roll_deg", "angle_y", "gyro_y", "y"]),
         get_nested_value(orientation, ["roll", "y"]),
         get_nested_value(imu, ["roll", "y"]),
         get_nested_value(mpu, ["roll", "y"]),
+        get_nested_value(mpu6050, ["roll", "y", "angle_y", "gyro_y"]),
+        get_nested_value(gyro, ["roll", "y", "angle_y", "gyro_y"]),
+        get_nested_value(gyroscope, ["roll", "y", "angle_y", "gyro_y"]),
+        get_nested_value(attitude, ["roll", "y", "angle_y"]),
     )
 
     return {
@@ -281,6 +326,9 @@ def get_sensor_data():
 
 
 @app.route("/api/robot-state", methods=["GET", "POST"])
+@app.route("/api/orientation", methods=["GET", "POST"])
+@app.route("/api/imu", methods=["GET", "POST"])
+@app.route("/api/mpu6050", methods=["GET", "POST"])
 def robot_state_endpoint():
     if request.method == "POST":
         payload = request.get_json(silent=True) or {}
