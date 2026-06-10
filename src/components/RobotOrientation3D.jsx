@@ -3,6 +3,7 @@ import * as THREE from 'three';
 
 const toRadians = (degrees = 0) => (degrees * Math.PI) / 180;
 const damp = 0.08;
+const wheelSpinSpeed = 0.18;
 
 const makeBox = (size, color, position, options = {}) => {
   const geometry = new THREE.BoxGeometry(size[0], size[1], size[2]);
@@ -73,6 +74,7 @@ const makeSpring = (x, z) => {
 
 const buildRobot = () => {
   const robot = new THREE.Group();
+  const wheels = [];
 
   robot.add(makeBox([2.75, 0.22, 1.55], '#0b1020', [0, 0.18, 0]));
   robot.add(makeBox([1.3, 0.2, 1.1], '#f59e0b', [0.28, 0.0, 0.02], { roughness: 0.5 }));
@@ -121,7 +123,9 @@ const buildRobot = () => {
     [-1.45, 0.78],
     [1.45, 0.78],
   ].forEach(([x, z]) => {
-    robot.add(makeWheel(x, z));
+    const wheel = makeWheel(x, z);
+    wheels.push(wheel);
+    robot.add(wheel);
     robot.add(makeSpring(x * 0.76, z * 0.72));
   });
 
@@ -134,14 +138,15 @@ const buildRobot = () => {
   bumper.rotation.z = Math.PI / 2;
   robot.add(bumper);
 
-  robot.rotation.y = -0.62;
+  robot.rotation.y = -0.92;
   robot.rotation.x = 0.08;
-  return robot;
+  return { robot, wheels };
 };
 
 const RobotOrientation3D = ({ pitch = 0, roll = 0, yaw = 0 }) => {
   const mountRef = useRef(null);
   const robotRef = useRef(null);
+  const wheelsRef = useRef([]);
   const frameRef = useRef(null);
   const attitudeRef = useRef({ pitch, roll, yaw });
 
@@ -154,8 +159,8 @@ const RobotOrientation3D = ({ pitch = 0, roll = 0, yaw = 0 }) => {
     if (!mount) return undefined;
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
-    camera.position.set(4.2, 3.2, 5.1);
+    const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
+    camera.position.set(4.8, 3.35, 5.7);
     camera.lookAt(0, 0.45, 0);
 
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
@@ -182,8 +187,9 @@ const RobotOrientation3D = ({ pitch = 0, roll = 0, yaw = 0 }) => {
     grid.material.opacity = 0.22;
     scene.add(grid);
 
-    const robot = buildRobot();
+    const { robot, wheels } = buildRobot();
     robotRef.current = robot;
+    wheelsRef.current = wheels;
     scene.add(robot);
 
     const resize = () => {
@@ -197,7 +203,7 @@ const RobotOrientation3D = ({ pitch = 0, roll = 0, yaw = 0 }) => {
     const animate = () => {
       if (robotRef.current) {
         const attitude = attitudeRef.current;
-        const baseYaw = -0.62;
+        const baseYaw = -0.92;
         const targetPitch = 0.08 + toRadians(attitude.pitch) * -0.7;
         const targetRoll = toRadians(attitude.roll) * 0.85;
         const targetYaw = baseYaw + toRadians(attitude.yaw);
@@ -206,6 +212,10 @@ const RobotOrientation3D = ({ pitch = 0, roll = 0, yaw = 0 }) => {
         robotRef.current.rotation.z += (targetRoll - robotRef.current.rotation.z) * damp;
         robotRef.current.rotation.y += (targetYaw - robotRef.current.rotation.y) * damp;
       }
+
+      wheelsRef.current.forEach((wheel) => {
+        wheel.rotation.x += wheelSpinSpeed;
+      });
 
       renderer.render(scene, camera);
       frameRef.current = requestAnimationFrame(animate);
@@ -233,6 +243,7 @@ const RobotOrientation3D = ({ pitch = 0, roll = 0, yaw = 0 }) => {
       });
       mount.removeChild(renderer.domElement);
       robotRef.current = null;
+      wheelsRef.current = [];
     };
   }, []);
 
