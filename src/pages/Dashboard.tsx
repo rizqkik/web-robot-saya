@@ -1,15 +1,13 @@
-import { useEffect, useState } from 'react';
-import { Battery, Wind, AlertTriangle, X, Gamepad2 } from 'lucide-react';
+import { Battery, Wind, AlertTriangle, Gamepad2 } from 'lucide-react';
 import Compass from '@/components/Compass';
 import VideoFeed from '@/components/VideoFeed';
 import AlertBanner from '@/components/AlertBanner';
 import ConnectionStatus from '@/components/ConnectionStatus';
+import LevelAreaStatusModal from '@/components/LevelAreaStatusModal';
 import { useSensorData } from '@/contexts/SensorDataContext';
 import { DangerLevel, getDangerLevelColor } from '@/data/mockData';
 import { getBackendConfig } from '@/lib/backendConfig';
 import { formatGasPpm } from '@/lib/utils';
-
-const LEVEL_MODAL_INTERVAL_MS = 5 * 60 * 1000;
 
 type BatteryStatus = 'Full' | 'Good' | 'Low' | 'Critical' | 'Unknown';
 
@@ -95,26 +93,11 @@ const BatteryIndicator = ({ title, value }: { title: string; value?: number | nu
 const Dashboard = () => {
   const { readings, robotStatus, isConnected, battery } = useSensorData();
   const { videoFeedUrl } = getBackendConfig();
-  const [isLevelModalOpen, setIsLevelModalOpen] = useState(false);
-  const [levelModalTimestamp, setLevelModalTimestamp] = useState(() => new Date().toLocaleString());
 
   const currentStatus: DangerLevel = robotStatus?.levelArea ?? 'Safe';
   const isHighDanger = currentStatus === 'High' || currentStatus === 'Dangerous';
   const isUnknownStatus = currentStatus === 'Unknown';
   const latestReading = readings[0];
-  const modalDangerLevel = currentStatus;
-
-  useEffect(() => {
-    const showLevelModal = () => {
-      setLevelModalTimestamp(new Date().toLocaleString());
-      setIsLevelModalOpen(true);
-    };
-
-    showLevelModal();
-    const interval = setInterval(showLevelModal, LEVEL_MODAL_INTERVAL_MS);
-
-    return () => clearInterval(interval);
-  }, []);
 
   const status = robotStatus || {
     direction: 0,
@@ -293,63 +276,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {isLevelModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
-          onClick={() => setIsLevelModalOpen(false)}
-        >
-          <div
-            className="w-full max-w-lg rounded-lg bg-card border border-border shadow-2xl overflow-hidden"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-5 border-b border-border">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Level Area Status</p>
-                <h3 className={`text-2xl font-bold ${getDangerLevelColor(modalDangerLevel)}`}>
-                  {modalDangerLevel}
-                </h3>
-              </div>
-              <button
-                type="button"
-                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                aria-label="Close level area status popup"
-                onClick={() => setIsLevelModalOpen(false)}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-5">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 rounded-lg bg-muted/40 border border-border">
-                  <p className="text-xs text-muted-foreground mb-1">CO2</p>
-                  <p className="text-xl font-bold font-mono text-foreground">
-                    {latestReading?.co2Valid === false ? 'Invalid' : formatGasPpm(latestReading?.co2)}
-                    {latestReading?.co2Valid !== false && <span className="text-sm text-muted-foreground"> ppm</span>}
-                  </p>
-                </div>
-                <div className="p-3 rounded-lg bg-muted/40 border border-border">
-                  <p className="text-xs text-muted-foreground mb-1">CO</p>
-                  <p className="text-xl font-bold font-mono text-foreground">{formatGasPpm(latestReading?.co)} <span className="text-sm text-muted-foreground">ppm</span></p>
-                </div>
-                <div className="p-3 rounded-lg bg-muted/40 border border-border">
-                  <p className="text-xs text-muted-foreground mb-1">LPG</p>
-                  <p className="text-xl font-bold font-mono text-foreground">{formatGasPpm(latestReading?.lpg)} <span className="text-sm text-muted-foreground">ppm</span></p>
-                </div>
-                <div className="p-3 rounded-lg bg-muted/40 border border-border">
-                  <p className="text-xs text-muted-foreground mb-1">H2S</p>
-                  <p className="text-xl font-bold font-mono text-foreground">{formatGasPpm(latestReading?.h2s)} <span className="text-sm text-muted-foreground">ppm</span></p>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between gap-4 rounded-lg bg-muted/30 border border-border px-4 py-3">
-                <span className="text-sm text-muted-foreground">Timestamp</span>
-                <span className="text-sm font-mono text-foreground text-right">{levelModalTimestamp}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <LevelAreaStatusModal level={currentStatus} reading={latestReading} />
 
       {/* Alert Banner */}
       <AlertBanner show={isHighDanger && isConnected} />

@@ -1,6 +1,7 @@
 import { Activity, Download, RefreshCw } from 'lucide-react';
 import GasDataTable from '@/components/GasDataTable';
 import ConnectionStatus from '@/components/ConnectionStatus';
+import LevelAreaStatusModal from '@/components/LevelAreaStatusModal';
 import { useSensorData } from '@/contexts/SensorDataContext';
 import { getWorstStatus } from '@/data/mockData';
 import { Button } from '@/components/ui/button';
@@ -8,8 +9,10 @@ import { Button } from '@/components/ui/button';
 const csvEscape = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
 
 const DataLogs = () => {
-  const { readings, isConnected, lastUpdate, isAutoUpdating, toggleRefresh } = useSensorData();
+  const { readings, robotStatus, isConnected, lastUpdate, isAutoUpdating, toggleRefresh } = useSensorData();
   const worstStatus = readings.length > 0 ? getWorstStatus(readings) : 'Safe';
+  const currentStatus = robotStatus?.levelArea ?? readings[0]?.status ?? worstStatus;
+  const latestReading = readings[0];
 
   const dangerousCount = readings.filter(r => r.status === 'Dangerous' || r.status === 'High').length;
   const safeCount = readings.filter(r => r.status === 'Safe' || r.status === 'Low').length;
@@ -29,19 +32,21 @@ const DataLogs = () => {
       reading.status,
     ]);
 
-    const csv = [headers, ...rows]
+    const csvBody = [headers, ...rows]
       .map((row) => row.map(csvEscape).join(','))
-      .join('\n');
+      .join('\r\n');
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([`\uFEFF${csvBody}`], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 
     link.href = url;
     link.download = `robot-rescue-gas-logs-${timestamp}.csv`;
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(url);
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
   };
 
   return (
@@ -106,13 +111,13 @@ const DataLogs = () => {
         <div className="p-4 rounded-lg bg-card border border-border">
           <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Current Status</p>
           <p className={`text-2xl font-bold font-mono ${
-            worstStatus === 'Dangerous' || worstStatus === 'High' 
+            currentStatus === 'Dangerous' || currentStatus === 'High' 
               ? 'text-destructive' 
-              : worstStatus === 'Moderate' 
+              : currentStatus === 'Moderate' 
                 ? 'text-warning' 
                 : 'text-success'
           }`}>
-            {worstStatus}
+            {currentStatus}
           </p>
         </div>
       </div>
@@ -141,6 +146,8 @@ const DataLogs = () => {
           </div>
         )}
       </div>
+
+      <LevelAreaStatusModal level={currentStatus} reading={latestReading} />
     </div>
   );
 };
